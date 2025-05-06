@@ -27,3 +27,4 @@ Overview of the project...
 ---
 
 Your PWA will be served at http://localhost:3000 and /ws will be listening for audio chunks.
+"# 1_whisper_translator" 
