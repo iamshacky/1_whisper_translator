@@ -3,8 +3,12 @@ console.log('Module loaded: /src/index.js');
 import { renderLanguageSelector } from './components/LanguageSelector.js';
 
 // ── Join the same “room” across devices ───────────────────────────────────
-const params = new URLSearchParams(window.location.search);
+//const params = new URLSearchParams(window.location.search);
+//const ROOM   = params.get('room') || 'default';
+
+const params = new URLSearchParams(location.search);
 const ROOM   = params.get('room') || 'default';
+
 console.log('Using room:', ROOM);
 
 
@@ -112,6 +116,8 @@ function createUI() {
   const listenWs = new WebSocket(
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
   );
+  console.log('🔔 [listener] connecting to', listenWs.url);
+  
   listenWs.binaryType = 'arraybuffer';
 
   listenWs.addEventListener('open', () => {
@@ -238,9 +244,12 @@ function sendToWhisper(blob) {
    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
   );
   */
+
   const ws = new WebSocket(
-   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
+    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
   );
+  console.log('🔊 [sendToWhisper] connecting to', ws.url);
+
   console.log('Opening send WS to:', ws.url);
 
   ws.binaryType = 'arraybuffer';
