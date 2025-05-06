@@ -104,6 +104,38 @@ function createUI() {
   );
   app.append(previewContainer);
 
+  // ── Always listen for others in the same room ───────────────────────────
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const listenWs = new WebSocket(
+    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
+  );
+  listenWs.binaryType = 'arraybuffer';
+
+  listenWs.addEventListener('open', () => {
+    console.log('🔔 Listening for others in room:', ROOM);
+  });
+
+  listenWs.addEventListener('message', ({ data }) => {
+    const msg = JSON.parse(data);
+    // only handle other people’s messages here
+    if (msg.speaker === 'them') {
+      const transcriptDiv = document.getElementById('transcript');
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+      `;
+      transcriptDiv.append(entry);
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+
+      // speak it out
+      const utter = new SpeechSynthesisUtterance(msg.original);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
+    }
+  });
+
+
   // --- Preview button handlers ---
 
   retranslateBtn.addEventListener('click', async () => {
