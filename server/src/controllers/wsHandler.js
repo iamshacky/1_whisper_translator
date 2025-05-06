@@ -1,41 +1,38 @@
 ﻿// server/src/controllers/wsHandler.js
-import { transcribeAudio } from '../services/openaiService.js';
+import { translateController } from './translate.js';
 
 const rooms = new Map(); // roomId → Set<WebSocket>
 
 export function setupWebSocket(wss) {
   wss.on('connection', (ws, req) => {
-    const url    = new URL(req.url, `http://${req.headers.host}`);
-    const roomId = url.searchParams.get('room') || 'default';
+    const url        = new URL(req.url, `http://${req.headers.host}`);
+    const roomId     = url.searchParams.get('room') || 'default';
+    const targetLang = url.searchParams.get('lang') || 'es';
 
     if (!rooms.has(roomId)) rooms.set(roomId, new Set());
     rooms.get(roomId).add(ws);
-    ws.roomId = roomId;
-
-    console.log(`🔊 [WS] Joined room=${roomId}`);
 
     ws.on('message', async (message) => {
-      console.log(`🔈 [WS:${roomId}] Got ${message.byteLength} bytes`);
       try {
-        const text = await transcribeAudio(Buffer.from(message));
-        console.log(`📝 [WS:${roomId}] Transcribed:`, text);
+        // 1) Transcribe & translate
+        const { text, translation } = await translateController(
+          Buffer.from(message),
+          targetLang
+        );
 
-        // Broadcast to all in room, tagging sender vs. others
+        // 2) Broadcast BOTH original + translation
         for (const client of rooms.get(roomId)) {
           if (client.readyState !== ws.OPEN) continue;
           const speaker = client === ws ? 'you' : 'them';
-          client.send(JSON.stringify({ speaker, original: text }));
+          client.send(JSON.stringify({ speaker, original: text, translation }));
         }
       } catch (err) {
-        console.error('❌ [WS] Error:', err);
+        console.error('❌ [WS] Error handling audio chunk:', err);
       }
     });
 
     ws.on('close', () => {
       rooms.get(roomId).delete(ws);
-      console.log(`👋 [WS] Left room=${roomId}`);
     });
-
-    ws.on('error', err => console.error('⚠️ [WS] Socket error:', err));
   });
 }
