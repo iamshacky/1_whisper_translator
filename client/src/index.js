@@ -117,13 +117,14 @@ function createUI() {
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
   );
   console.log('🔔 [listener] connecting to', listenWs.url);
-  
+
   listenWs.binaryType = 'arraybuffer';
 
   listenWs.addEventListener('open', () => {
     console.log('🔔 Listening for others in room:', ROOM);
   });
 
+  /*
   listenWs.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
     // only handle other people’s messages here
@@ -143,6 +144,27 @@ function createUI() {
       speechSynthesis.speak(utter);
     }
   });
+  */
+  listenWs.addEventListener('message', ({ data }) => {
+    const msg = JSON.parse(data);
+    if (msg.speaker === 'them') {
+      const transcriptDiv = document.getElementById('transcript');
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+        <p><strong>Translation:</strong> ${msg.translation}</p>
+      `;
+      transcriptDiv.append(entry);
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+
+      // Speak the translation:
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
+    }
+  });
+
 
 
   // --- Preview button handlers ---
