@@ -5,6 +5,8 @@ import { renderLanguageSelector } from './components/LanguageSelector.js';
 // ── Join the same “room” across devices ───────────────────────────────────
 const params = new URLSearchParams(window.location.search);
 const ROOM   = params.get('room') || 'default';
+console.log('Using room:', ROOM);
+
 
 console.log('Using room:', ROOM);
 
@@ -231,9 +233,15 @@ function sendToWhisper(blob) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   //const ws = new WebSocket(`${proto}//${location.host}/ws?lang=${currentLang}`);
   // new — now joining the same ROOM as your listener
+  /*
   const ws = new WebSocket(
    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
   );
+  */
+  const ws = new WebSocket(
+   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
+  );
+  console.log('Opening send WS to:', ws.url);
 
   ws.binaryType = 'arraybuffer';
 
