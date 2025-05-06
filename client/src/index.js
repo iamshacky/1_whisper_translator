@@ -145,6 +145,7 @@ function createUI() {
     }
   });
   */
+  /*
   listenWs.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
     if (msg.speaker === 'them') {
@@ -164,6 +165,28 @@ function createUI() {
       speechSynthesis.speak(utter);
     }
   });
+  */
+  listenWs.addEventListener('message', ({ data }) => {
+    const msg = JSON.parse(data);
+    if (msg.speaker === 'them') {
+      // 1) Render both original & translation
+      const transcriptDiv = document.getElementById('transcript');
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+        <p><strong>Translation:</strong> ${msg.translation}</p>
+      `;
+      transcriptDiv.append(entry);
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+
+      // 2) Speak the translation only
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
+    }
+  });
+
 
 
 
@@ -295,22 +318,6 @@ function sendToWhisper(blob) {
       showPreview(msg.original);
       ws.close();
       return;
-    }
-
-    // Otherwise it's someone else's message: display & speak it
-    if (msg.speaker === 'them') {
-      const transcriptDiv = document.getElementById('transcript');
-      const entry = document.createElement('div');
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-      `;
-      transcriptDiv.append(entry);
-      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-
-      const utter = new SpeechSynthesisUtterance(msg.original);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
     }
   });
 
