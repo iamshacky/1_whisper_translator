@@ -8,8 +8,8 @@ import { renderLanguageSelector } from './components/LanguageSelector.js';
 
 const params = new URLSearchParams(location.search);
 const ROOM   = params.get('room') || 'default';
-
-console.log('Using room:', ROOM);
+// a stable per-page UUID. Modern browsers support this:
+const CLIENT_ID = crypto.randomUUID();
 
 
 console.log('Using room:', ROOM);
@@ -113,9 +113,16 @@ function createUI() {
 
   // ── Always listen for others in the same room ───────────────────────────
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  /*
   const listenWs = new WebSocket(
-    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
+    `${proto}//${location.host}/ws`
+    `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
+  */
+  const listenWs = new WebSocket(
+   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+  );
+
   console.log('🔔 [listener] connecting to', listenWs.url);
 
   listenWs.binaryType = 'arraybuffer';
@@ -124,51 +131,11 @@ function createUI() {
     console.log('🔔 Listening for others in room:', ROOM);
   });
 
-  /*
-  listenWs.addEventListener('message', ({ data }) => {
-    const msg = JSON.parse(data);
-    // only handle other people’s messages here
-    if (msg.speaker === 'them') {
-      const transcriptDiv = document.getElementById('transcript');
-      const entry = document.createElement('div');
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-      `;
-      transcriptDiv.append(entry);
-      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
 
-      // speak it out
-      const utter = new SpeechSynthesisUtterance(msg.original);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
-    }
-  });
-  */
-  /*
-  listenWs.addEventListener('message', ({ data }) => {
-    const msg = JSON.parse(data);
-    if (msg.speaker === 'them') {
-      const transcriptDiv = document.getElementById('transcript');
-      const entry = document.createElement('div');
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-        <p><strong>Translation:</strong> ${msg.translation}</p>
-      `;
-      transcriptDiv.append(entry);
-      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
 
-      // Speak the translation:
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
-    }
-  });
-  */
   listenWs.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
-    if (msg.speaker === 'them') {
+    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {  
       // 1) Render both original & translation
       const transcriptDiv = document.getElementById('transcript');
       const entry = document.createElement('div');
@@ -191,7 +158,7 @@ function createUI() {
 
 
   // --- Preview button handlers ---
-
+/*
   retranslateBtn.addEventListener('click', async () => {
     const edited = previewOriginal.value.trim();
     if (!edited) return;
@@ -211,6 +178,37 @@ function createUI() {
       status.textContent = 'Error';
     }
   });
+  */
+  retranslateBtn.addEventListener('click', async () => {
+    const edited = previewOriginal.value.trim();
+    console.log('[DEBUG] Re-translate clicked, text=', edited);
+    if (!edited) return;
+    status.textContent = 'Translating…';
+    try {
+      const resp = await fetch('/api/translate-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: edited, lang: currentLang })
+      });
+      if (!resp.ok) {
+        console.error('[DEBUG] /api/translate-text HTTP error', resp.status);
+        status.textContent = 'Error';
+        return;
+      }
+      const { translation } = await resp.json();
+      console.log('[DEBUG] Translation received:', translation);
+      previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${translation}</p>`;
+      status.textContent = 'Preview';
+      console.log('[DEBUG] Enabling Send button');
+      // force-enable it two ways
+      sendBtn.disabled = false;
+      sendBtn.removeAttribute('disabled');
+    } catch (err) {
+      console.error('[DEBUG] Translate API error', err);
+      status.textContent = 'Error';
+    }
+  });
+
 
   sendBtn.addEventListener('click', () => {
     const original = previewOriginal.value.trim();
@@ -282,17 +280,10 @@ function stopTranslating() {
 function sendToWhisper(blob) {
   statusElement('Transcribing…');
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  //const ws = new WebSocket(`${proto}//${location.host}/ws?lang=${currentLang}`);
-  // new — now joining the same ROOM as your listener
-  /*
   const ws = new WebSocket(
-   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
+   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
-  */
 
-  const ws = new WebSocket(
-    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}`
-  );
   console.log('🔊 [sendToWhisper] connecting to', ws.url);
 
   console.log('Opening send WS to:', ws.url);
