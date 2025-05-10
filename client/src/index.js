@@ -209,11 +209,11 @@ function createUI() {
     }
   });
 
-
   sendBtn.addEventListener('click', () => {
-    const original = previewOriginal.value.trim();
+    const original    = previewOriginal.value.trim();
     const translation = previewTranslation.textContent.replace(/^Translation:/, '').trim();
 
+    // 1) Append local entry
     const entry = document.createElement('div');
     entry.innerHTML = `
       <hr>
@@ -223,17 +223,26 @@ function createUI() {
     transcript.append(entry);
     transcript.scrollTop = transcript.scrollHeight;
 
+    // 2) Speak it out
     const utter = new SpeechSynthesisUtterance(translation);
     utter.onend = () => { status.textContent = 'Idle'; };
     speechSynthesis.speak(utter);
 
-    // reset preview
-    previewOriginal.value = '';
+    // 3) BROADCAST to the room via your listening WS
+    listenWs.send(JSON.stringify({
+      original,
+      translation,
+      clientId: CLIENT_ID
+    }));
+
+    // 4) Reset preview UI
+    previewOriginal.value     = '';
     previewTranslation.innerHTML = '';
-    retranslateBtn.disabled = true;
-    sendBtn.disabled = true;
-    deleteBtn.disabled = true;
+    retranslateBtn.disabled   = true;
+    sendBtn.disabled          = true;
+    deleteBtn.disabled        = true;
   });
+
 
   deleteBtn.addEventListener('click', () => {
     status.textContent = 'Idle';
@@ -295,13 +304,6 @@ function sendToWhisper(blob) {
     ws.send(blob);
   });
 
-  /*
-  ws.addEventListener('message', ({ data }) => {
-    const { original } = JSON.parse(data);
-    showPreview(original);
-    ws.close();
-  });
-  */
   ws.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
     // If it's your own transcription, go into preview/edit mode
