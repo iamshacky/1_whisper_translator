@@ -1,47 +1,33 @@
-﻿import { WebSocket } from 'ws';
+﻿// server/src/controllers/wsHandler.js
+import WebSocket from 'ws';
 import { translateController } from './translate.js';
 import { randomUUID } from 'crypto';
 
 const rooms = new Map(); // roomId → Set<WebSocket>
 
 /**
- * Initializes WebSocket routing: raw audio → preview
- * and final chat messages → broadcast.
+ * Initializes your WebSocketServer:
+ *  - binary frames → Whisper preview & translation back to sender
+ *  - text frames   → broadcast original+translation to everyone in the room
  */
 export function setupWebSocket(wss) {
   wss.on('connection', (ws, req) => {
-    // Parse room, language, and clientId from URL
+    // parse room, lang, clientId
     const url        = new URL(req.url, `http://${req.headers.host}`);
     const roomId     = url.searchParams.get('room') || 'default';
     const targetLang = url.searchParams.get('lang') || 'es';
     const clientId   = url.searchParams.get('clientId') || randomUUID();
     ws.clientId      = clientId;
 
-    // Track clients per room
+    // join the room
     if (!rooms.has(roomId)) rooms.set(roomId, new Set());
     rooms.get(roomId).add(ws);
 
-    ws.on('message', async (message) => {
-      console.log('[WS] got message of type', typeof message, 'from', ws.clientId);
+    ws.on('message', async (message, isBinary) => {
+      console.log('[WS] got', isBinary ? 'binary' : 'string', 'from', clientId);
       try {
-        // Final chat: broadcast to everyone in the room
-        if (typeof message === 'string') {
-          console.log('[WS] chat broadcast payload:', message);
-          const { original, translation, clientId: cid } = JSON.parse(message);
-
-          for (const client of rooms.get(roomId)) {
-            if (client.readyState !== WebSocket.OPEN) continue;
-            const speaker = client === ws ? 'you' : 'them';
-            client.send(JSON.stringify({
-              speaker,
-              original,
-              translation,
-              clientId: cid
-            }));
-          }
-
-        // Preview-only: transcribe & translate, send back to sender
-        } else {
+        if (isBinary) {
+          // —— PREVIEW only —— transcribe & translate, send back to sender
           const { text, translation } = await translateController(
             Buffer.from(message),
             targetLang
@@ -52,6 +38,19 @@ export function setupWebSocket(wss) {
             translation,
             clientId
           }));
+        } else {
+          // —— FINAL CHAT —— broadcast to everyone in room
+          const { original, translation, clientId: senderId } = JSON.parse(message.toString());
+          for (const client of rooms.get(roomId)) {
+            if (client.readyState !== WebSocket.OPEN) continue;
+            const speaker = client === ws ? 'you' : 'them';
+            client.send(JSON.stringify({
+              speaker,
+              original,
+              translation,
+              clientId: senderId
+            }));
+          }
         }
       } catch (err) {
         console.error('❌ [WS] Error handling message:', err);
@@ -59,7 +58,10 @@ export function setupWebSocket(wss) {
     });
 
     ws.on('close', () => {
-      rooms.get(roomId).delete(ws);
+      const room = rooms.get(roomId);
+      if (!room) return;
+      room.delete(ws);
+      if (room.size === 0) rooms.delete(roomId);
     });
   });
 }
