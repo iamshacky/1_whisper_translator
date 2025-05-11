@@ -133,26 +133,42 @@ function createUI() {
 
 
 
-  listenWs.addEventListener('message', ({ data }) => {
-    const msg = JSON.parse(data);
-    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {  
-      // 1) Render both original & translation
-      const transcriptDiv = document.getElementById('transcript');
-      const entry = document.createElement('div');
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-        <p><strong>Translation:</strong> ${msg.translation}</p>
-      `;
-      transcriptDiv.append(entry);
-      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+    listenWs.addEventListener('message', ({ data }) => {
+      // 1) Log the raw data we get (could be ArrayBuffer or string)
+      console.log('[DEBUG][listenWs] raw data:', data);
 
-      // 2) Speak the translation only
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
-    }
-  });
+      // 2) Try to parse it as JSON
+      let msg;
+      try {
+        msg = JSON.parse(data);
+      } catch (e) {
+        console.error('[DEBUG][listenWs] JSON parse error:', e, '— data was:', data);
+        return;
+      }
+      console.log('[DEBUG][listenWs] parsed msg:', msg);
+
+      // 3) Only render messages from *others* in the room
+      if (msg.speaker === 'them') {
+        if (msg.clientId === CLIENT_ID) {
+          console.log('[DEBUG][listenWs] ignoring own broadcast');
+          return;
+        }
+        const transcriptDiv = document.getElementById('transcript');
+        const entry = document.createElement('div');
+        entry.innerHTML = `
+          <hr>
+          <p><strong>They said:</strong> ${msg.original}</p>
+          <p><strong>Translation:</strong> ${msg.translation}</p>
+        `;
+        transcriptDiv.append(entry);
+        transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+
+        const utter = new SpeechSynthesisUtterance(msg.translation);
+        utter.lang = currentLang;
+        speechSynthesis.speak(utter);
+      }
+    });
+
 
 
 
@@ -304,6 +320,7 @@ function sendToWhisper(blob) {
 
   ws.addEventListener('open', () => {
     console.log('WS open – sending audio blob');
+    console.log('🔔 Listening for others in room:', ROOM);
     ws.send(blob);
   });
 
