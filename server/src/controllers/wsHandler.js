@@ -1,35 +1,47 @@
-﻿// server/src/controllers/wsHandler.js
+﻿import { WebSocket } from 'ws';
 import { translateController } from './translate.js';
 import { randomUUID } from 'crypto';
 
 const rooms = new Map(); // roomId → Set<WebSocket>
 
+/**
+ * Initializes WebSocket routing: raw audio → preview
+ * and final chat messages → broadcast.
+ */
 export function setupWebSocket(wss) {
   wss.on('connection', (ws, req) => {
+    // Parse room, language, and clientId from URL
     const url        = new URL(req.url, `http://${req.headers.host}`);
     const roomId     = url.searchParams.get('room') || 'default';
     const targetLang = url.searchParams.get('lang') || 'es';
     const clientId   = url.searchParams.get('clientId') || randomUUID();
     ws.clientId      = clientId;
 
+    // Track clients per room
     if (!rooms.has(roomId)) rooms.set(roomId, new Set());
     rooms.get(roomId).add(ws);
 
     ws.on('message', async (message) => {
       console.log('[WS] got message of type', typeof message, 'from', ws.clientId);
       try {
-        // Distinguish preview (binary) vs final chat (string)
+        // Final chat: broadcast to everyone in the room
         if (typeof message === 'string') {
-          // FINAL: broadcast original+translation from the sender
           console.log('[WS] chat broadcast payload:', message);
           const { original, translation, clientId: cid } = JSON.parse(message);
+
           for (const client of rooms.get(roomId)) {
-            if (client.readyState !== ws.OPEN) continue;
+            if (client.readyState !== WebSocket.OPEN) continue;
             const speaker = client === ws ? 'you' : 'them';
-            client.send(JSON.stringify({ speaker, original, translation, clientId: cid }));
+            client.send(JSON.stringify({
+              speaker,
+              original,
+              translation,
+              clientId: cid
+            }));
           }
+
+        // Preview-only: transcribe & translate, send back to sender
         } else {
-          // PREVIEW: just transcribe & translate back to the same client
           const { text, translation } = await translateController(
             Buffer.from(message),
             targetLang
