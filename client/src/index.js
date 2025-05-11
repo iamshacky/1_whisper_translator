@@ -116,10 +116,22 @@ function createUI() {
       `;
       transcript.append(entry);
       transcript.scrollTop = transcript.scrollHeight;
+      /*
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
+      */
+      /*
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
+      */
 
-      const utt = new SpeechSynthesisUtterance(msg.translation);
-      utt.lang = currentLang;
-      speechSynthesis.speak(utt);
+      // clear out any queued speech
+      speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
     }
   });
 
@@ -174,9 +186,22 @@ function createUI() {
     transcript.scrollTop = transcript.scrollHeight;
 
     // Speak
-    const utt = new SpeechSynthesisUtterance(translation);
-    utt.onend = () => statusElement('Idle');
-    speechSynthesis.speak(utt);
+    /*
+    const utter = new SpeechSynthesisUtterance(translation);
+    utter.onend = () => statusElement('Idle');
+    speechSynthesis.speak(utter);
+    */
+    /*
+    const utter = new SpeechSynthesisUtterance(translation);
+    utter.onend = () => statusElement('Idle');
+    speechSynthesis.speak(utter);
+    */
+    // clear any queued speech, then speak
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(translation);
+    utter.lang  = currentLang;
+    utter.onend = () => { status.textContent = 'Idle'; };
+    speechSynthesis.speak(utter);
 
     // Broadcast
     console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
