@@ -111,25 +111,24 @@ function createUI() {
   );
   app.append(previewContainer);
 
-  // ── Always listen for others in the same room ───────────────────────────
+  // ── Always listen for others in the same room ───────────────────────────────────────────────────
   const proto   = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const listenWs = new WebSocket(
     `${proto}//${location.host}/ws`
     + `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
 
-  // (A) confirm connect/close on the listener
+  // (A) listener-only open/close logs:
   listenWs.addEventListener('open', () => {
     console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
   });
   listenWs.addEventListener('close', () => {
-    console.warn('🔔 [listenWs] closed; please refresh to rejoin');
+    console.warn('🔔 [listenWs] closed; refresh to rejoin the room');
   });
 
-  // (B) log every incoming frame, parse it, then filter/render
+  // (B) raw + parsed logging on incoming frames:
   listenWs.addEventListener('message', ({ data }) => {
     console.log('[DEBUG][listenWs] raw data:', data);
-
     let msg;
     try {
       msg = JSON.parse(data);
@@ -139,11 +138,8 @@ function createUI() {
     }
     console.log('[DEBUG][listenWs] parsed msg:', msg);
 
-    if (msg.speaker === 'them') {
-      if (msg.clientId === CLIENT_ID) {
-        console.log('[DEBUG][listenWs] ignoring own broadcast');
-        return;
-      }
+    // only render “they said” from others
+    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
       const transcriptDiv = document.getElementById('transcript');
       const entry = document.createElement('div');
       entry.innerHTML = `
@@ -153,7 +149,6 @@ function createUI() {
       `;
       transcriptDiv.append(entry);
       transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-
       const utter = new SpeechSynthesisUtterance(msg.translation);
       utter.lang = currentLang;
       speechSynthesis.speak(utter);
