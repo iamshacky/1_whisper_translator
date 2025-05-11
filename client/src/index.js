@@ -118,27 +118,27 @@ function createUI() {
     + `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
 
-  // (A) listener-only open/close logs:
+  // (A) Confirm it really opened
   listenWs.addEventListener('open', () => {
     console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
   });
   listenWs.addEventListener('close', () => {
-    console.warn('🔔 [listenWs] closed; refresh to rejoin the room');
+    console.warn('🔔 [listenWs] closed; please refresh to rejoin');
   });
 
-  // (B) raw + parsed logging on incoming frames:
+  // (B) Log EVERYTHING we get, then parse & render
   listenWs.addEventListener('message', ({ data }) => {
     console.log('[DEBUG][listenWs] raw data:', data);
+
     let msg;
     try {
       msg = JSON.parse(data);
     } catch (e) {
-      console.error('[DEBUG][listenWs] parse error:', e, '— data was:', data);
+      console.error('[DEBUG][listenWs] parse error:', e, '– data was:', data);
       return;
     }
     console.log('[DEBUG][listenWs] parsed msg:', msg);
 
-    // only render “they said” from others
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
       const transcriptDiv = document.getElementById('transcript');
       const entry = document.createElement('div');
@@ -149,12 +149,12 @@ function createUI() {
       `;
       transcriptDiv.append(entry);
       transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+
       const utter = new SpeechSynthesisUtterance(msg.translation);
       utter.lang = currentLang;
       speechSynthesis.speak(utter);
     }
   });
-
 
 
   retranslateBtn.addEventListener('click', async () => {
@@ -186,6 +186,34 @@ function createUI() {
       status.textContent = 'Error';
     }
   });
+
+  // ── SENDER — transcribe → preview via a separate WS ───────────────────
+  async function sendToWhisper(blob) {
+    statusElement('Transcribing…');
+    const ws = new WebSocket(
+      `${proto}//${location.host}/ws`
+      + `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+    );
+    ws.binaryType = 'arraybuffer';
+
+    ws.addEventListener('open', () => {
+      console.log('WS open – sending audio blob');
+      ws.send(blob);
+    });
+
+    ws.addEventListener('message', ({ data }) => {
+      const msg = JSON.parse(data);
+      if (msg.speaker === 'you') {
+        showPreview(msg.original);
+        ws.close();
+      }
+    });
+
+    ws.addEventListener('error', err => {
+      console.error('WS error', err);
+      statusElement('Error');
+    });
+  }
 
   sendBtn.addEventListener('click', () => {
     const original    = previewOriginal.value.trim();
