@@ -2,16 +2,9 @@
 console.log('Module loaded: /src/index.js');
 import { renderLanguageSelector } from './components/LanguageSelector.js';
 
-// ── Join the same “room” across devices ───────────────────────────────────
-//const params = new URLSearchParams(window.location.search);
-//const ROOM   = params.get('room') || 'default';
-
-const params = new URLSearchParams(location.search);
-const ROOM   = params.get('room') || 'default';
-// a stable per-page UUID. Modern browsers support this:
+const params    = new URLSearchParams(location.search);
+const ROOM      = params.get('room') || 'default';
 const CLIENT_ID = crypto.randomUUID();
-
-
 console.log('Using room:', ROOM);
 
 let mediaRecorder;
@@ -21,7 +14,7 @@ let currentLang = 'es';
 function createUI() {
   const app = document.getElementById('app');
 
-  // --- Language selector ---
+  //── Language selector ───────────────────────────────────
   const langLabel = document.createElement('label');
   langLabel.textContent = 'Target lang: ';
   const langSel = renderLanguageSelector(langLabel);
@@ -31,7 +24,7 @@ function createUI() {
     console.log('Language set to', currentLang);
   });
 
-  // --- Controls: Start / Stop / Status ---
+  //── Controls: Start / Stop / Status ──────────────────────
   const startBtn = document.createElement('button');
   startBtn.id = 'start';
   startBtn.textContent = 'Start';
@@ -47,152 +40,162 @@ function createUI() {
   startBtn.addEventListener('click', startTranslating);
   stopBtn.addEventListener('click', stopTranslating);
 
-  // --- Transcript area ---
-  const transcriptContainer = document.createElement('div');
-  transcriptContainer.id = 'transcriptContainer';
-  const transcriptTitle = document.createElement('h3');
-  transcriptTitle.textContent = 'Transcript';
+  //── Transcript area ────────────────────────────────────
   const transcript = document.createElement('div');
   transcript.id = 'transcript';
-  transcriptContainer.append(transcriptTitle, transcript);
-  app.append(transcriptContainer);
+  app.append(document.createElement('hr'), transcript);
 
-  // --- Preview area ---
-  const previewContainer = document.createElement('div');
-  previewContainer.id = 'previewContainer';
-  previewContainer.style.border = '1px solid #ccc';
-  previewContainer.style.padding = '8px';
-  previewContainer.style.margin = '8px 0';
+  //── Preview/Edit area ───────────────────────────────────
+  const previewOriginal    = document.createElement('textarea');
+  const previewTranslation = document.createElement('div');
+  const retranslateBtn     = document.createElement('button');
+  const sendBtn            = document.createElement('button');
+  const deleteBtn          = document.createElement('button');
 
-  const previewTitle = document.createElement('h3');
-  previewTitle.textContent = 'Preview';
-  const previewOriginal = document.createElement('textarea');
   previewOriginal.id = 'previewOriginal';
   previewOriginal.rows = 3;
   previewOriginal.style.width = '100%';
 
-
-  // --- allow manual edits to kick off re-translate/delete ---
-  previewOriginal.addEventListener('input', () => {
-    const txt = previewOriginal.value.trim();
-    retranslateBtn.disabled = !txt;
-    deleteBtn.disabled     = !txt;
-    // clear any old translation, disable final Send
-    previewTranslation.innerHTML = '';
-    sendBtn.disabled = true;
-    // update status so user knows they can re-translate
-    document.getElementById('status').textContent = txt ? 'Preview' : 'Idle';
- });
-  const previewTranslation = document.createElement('div');
-  previewTranslation.id = 'previewTranslation';
-
-  const retranslateBtn = document.createElement('button');
   retranslateBtn.id = 'retranslateBtn';
-  retranslateBtn.textContent = 'Re-Translate';
+  retranslateBtn.textContent = 'Edit';
   retranslateBtn.disabled = true;
 
-  const sendBtn = document.createElement('button');
   sendBtn.id = 'sendBtn';
   sendBtn.textContent = 'Send';
   sendBtn.disabled = true;
 
-  const deleteBtn = document.createElement('button');
   deleteBtn.id = 'deleteBtn';
   deleteBtn.textContent = 'Delete';
   deleteBtn.disabled = true;
 
+  previewOriginal.addEventListener('input', () => {
+    const txt = previewOriginal.value.trim();
+    retranslateBtn.disabled = !txt;
+    deleteBtn.disabled     = !txt;
+    previewTranslation.innerHTML = '';
+    sendBtn.disabled = !txt;  // send available immediately
+    statusElement(txt ? 'Preview' : 'Idle');
+  });
+
+  const previewContainer = document.createElement('div');
+  previewContainer.style.border = '1px solid #ccc';
+  previewContainer.style.padding = '8px';
+  previewContainer.style.margin = '8px 0';
   previewContainer.append(
-    previewTitle,
+    document.createElement('h3'),
     previewOriginal,
     previewTranslation,
     retranslateBtn,
     sendBtn,
     deleteBtn
   );
+  previewContainer.querySelector('h3').textContent = 'Preview';
   app.append(previewContainer);
 
-  // ── Always listen for others in the same room ───────────────────────────────────────────────────
-  const proto   = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  //── Always listen for broadcasts ────────────────────────
+  const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const listenWs = new WebSocket(
-    `${proto}//${location.host}/ws`
-    + `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
+  listenWs.binaryType = 'arraybuffer';
 
-  // (A) Confirm it really opened
   listenWs.addEventListener('open', () => {
     console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
   });
-  listenWs.addEventListener('close', () => {
-    console.warn('🔔 [listenWs] closed; please refresh to rejoin');
-  });
-
-  // (B) Log EVERYTHING we get, then parse & render
   listenWs.addEventListener('message', ({ data }) => {
-    console.log('[DEBUG][listenWs] raw data:', data);
-
     let msg;
-    try {
-      msg = JSON.parse(data);
-    } catch (e) {
-      console.error('[DEBUG][listenWs] parse error:', e, '– data was:', data);
-      return;
-    }
-    console.log('[DEBUG][listenWs] parsed msg:', msg);
+    try { msg = JSON.parse(data); }
+    catch (e) { return console.error('Bad JSON', e, 'data:', data); }
 
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-      const transcriptDiv = document.getElementById('transcript');
       const entry = document.createElement('div');
       entry.innerHTML = `
         <hr>
         <p><strong>They said:</strong> ${msg.original}</p>
         <p><strong>Translation:</strong> ${msg.translation}</p>
       `;
-      transcriptDiv.append(entry);
-      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+      transcript.append(entry);
+      transcript.scrollTop = transcript.scrollHeight;
 
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
+      const utt = new SpeechSynthesisUtterance(msg.translation);
+      utt.lang = currentLang;
+      speechSynthesis.speak(utt);
     }
   });
 
-
+  //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
     const edited = previewOriginal.value.trim();
-    console.log('[DEBUG] Re-translate clicked, text=', edited);
     if (!edited) return;
-    status.textContent = 'Translating…';
+    statusElement('Translating…');
     try {
       const resp = await fetch('/api/translate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: edited, lang: currentLang })
       });
-      if (!resp.ok) {
-        console.error('[DEBUG] /api/translate-text HTTP error', resp.status);
-        status.textContent = 'Error';
-        return;
-      }
+      if (!resp.ok) throw new Error(resp.status);
       const { translation } = await resp.json();
-      console.log('[DEBUG] Translation received:', translation);
       previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${translation}</p>`;
-      status.textContent = 'Preview';
-      console.log('[DEBUG] Enabling Send button');
-      // force-enable it two ways
+      statusElement('Preview');
       sendBtn.disabled = false;
-      sendBtn.removeAttribute('disabled');
     } catch (err) {
-      console.error('[DEBUG] Translate API error', err);
-      status.textContent = 'Error';
+      console.error('Translate error', err);
+      statusElement('Error');
     }
   });
 
-  // ── SENDER — transcribe → preview via a separate WS ───────────────────
+  //── Delete preview ──────────────────────────────────────
+  deleteBtn.addEventListener('click', () => {
+    statusElement('Idle');
+    previewOriginal.value = '';
+    previewTranslation.innerHTML = '';
+    retranslateBtn.disabled = true;
+    sendBtn.disabled = true;
+    deleteBtn.disabled = true;
+  });
+
+  //── Send final message ──────────────────────────────────
+  sendBtn.addEventListener('click', () => {
+    const original    = previewOriginal.value.trim();
+    const translation = previewTranslation
+                          .textContent
+                          .replace(/^Translation:/, '')
+                          .trim();
+
+    // Local echo
+    const entry = document.createElement('div');
+    entry.innerHTML = `
+      <hr>
+      <p><strong>You said:</strong> ${original}</p>
+      <p><strong>Translation:</strong> ${translation}</p>
+    `;
+    transcript.append(entry);
+    transcript.scrollTop = transcript.scrollHeight;
+
+    // Speak
+    const utt = new SpeechSynthesisUtterance(translation);
+    utt.onend = () => statusElement('Idle');
+    speechSynthesis.speak(utt);
+
+    // Broadcast
+    console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
+    listenWs.send(JSON.stringify({ original, translation, clientId: CLIENT_ID }));
+
+    // Reset preview
+    statusElement('Idle');
+    previewOriginal.value = '';
+    previewTranslation.innerHTML = '';
+    retranslateBtn.disabled = true;
+    sendBtn.disabled = true;
+    deleteBtn.disabled = true;
+  });
+
+  //── Inside createUI: only one sendToWhisper ─────────────
   async function sendToWhisper(blob) {
     statusElement('Transcribing…');
     const ws = new WebSocket(
-      `${proto}//${location.host}/ws`
-      + `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+      `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
     );
     ws.binaryType = 'arraybuffer';
 
@@ -204,7 +207,13 @@ function createUI() {
     ws.addEventListener('message', ({ data }) => {
       const msg = JSON.parse(data);
       if (msg.speaker === 'you') {
-        showPreview(msg.original);
+        previewOriginal.value = msg.original;
+        previewTranslation.innerHTML = '';
+        retranslateBtn.disabled = false;
+        sendBtn.disabled = true;
+        deleteBtn.disabled = false;
+        toggleButtons({ start: false, stop: true });
+        statusElement('Preview');
         ws.close();
       }
     });
@@ -215,135 +224,40 @@ function createUI() {
     });
   }
 
-  sendBtn.addEventListener('click', () => {
-    const original    = previewOriginal.value.trim();
-    const translation = previewTranslation.textContent.replace(/^Translation:/, '').trim();
-
-    // 1) Append local entry
-    const entry = document.createElement('div');
-    entry.innerHTML = `
-      <hr>
-      <p><strong>You said:</strong> ${original}</p>
-      <p><strong>Translation:</strong> ${translation}</p>
-    `;
-    transcript.append(entry);
-    transcript.scrollTop = transcript.scrollHeight;
-
-    // 2) Speak it out
-    const utter = new SpeechSynthesisUtterance(translation);
-    utter.onend = () => { status.textContent = 'Idle'; };
-    speechSynthesis.speak(utter);
-
-    // 3) BROADCAST to the room via your listening WS
-    console.log('[DEBUG] Broadcasting via listenWs:', {
-      original, translation, clientId: CLIENT_ID
-    });
-    listenWs.send(JSON.stringify({
-      original,
-      translation,
-      clientId: CLIENT_ID
-    }));
-
-    // 4) Reset preview UI
-    previewOriginal.value     = '';
-    previewTranslation.innerHTML = '';
-    retranslateBtn.disabled   = true;
-    sendBtn.disabled          = true;
-    deleteBtn.disabled        = true;
-  });
-
-
-  deleteBtn.addEventListener('click', () => {
-    status.textContent = 'Idle';
-    previewOriginal.value = '';
-    previewTranslation.innerHTML = '';
-    retranslateBtn.disabled = true;
-    sendBtn.disabled = true;
-    deleteBtn.disabled = true;
-  });
-}
-
-async function startTranslating() {
-  console.log('Start clicked, lang=', currentLang);
-  statusElement('Recording…');
-  audioChunks = [];
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.addEventListener('dataavailable', e => {
-      audioChunks.push(e.data);
-    });
-    mediaRecorder.addEventListener('stop', () => {
-      const blob = new Blob(audioChunks, { type: 'audio/webm' });
-      sendToWhisper(blob);
-    });
-    mediaRecorder.start();
-    toggleButtons({ start: true, stop: false });
-  } catch (err) {
-    console.error('Error starting recording', err);
-    statusElement('Error');
-  }
-}
-
-function stopTranslating() {
-  console.log('Stop clicked');
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
-  statusElement('Transcribing…');
-  toggleButtons({ stop: true });
-}
-
-function sendToWhisper(blob) {
-  statusElement('Transcribing…');
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(
-   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
-  );
-
-  console.log('🔊 [sendToWhisper] connecting to', ws.url);
-
-  console.log('Opening send WS to:', ws.url);
-
-  ws.binaryType = 'arraybuffer';
-
-  ws.addEventListener('open', () => {
-    console.log('WS open – sending audio blob');
-    console.log('🔔 Listening for others in room:', ROOM);
-    ws.send(blob);
-  });
-
-  ws.addEventListener('message', ({ data }) => {
-    const msg = JSON.parse(data);
-    // If it's your own transcription, go into preview/edit mode
-    if (msg.speaker === 'you') {
-      showPreview(msg.original);
-      ws.close();
-      return;
+  //── Recording controls ──────────────────────────────────
+  async function startTranslating() {
+    console.log('Start clicked, lang=', currentLang);
+    statusElement('Recording…');
+    audioChunks = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.addEventListener('dataavailable', e => audioChunks.push(e.data));
+      mediaRecorder.addEventListener('stop', () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        sendToWhisper(blob);
+      });
+      mediaRecorder.start();
+      toggleButtons({ start: true, stop: false });
+    } catch (err) {
+      console.error('Error starting recording', err);
+      statusElement('Error');
     }
-  });
+  }
 
-  ws.addEventListener('error', err => {
-    console.error('WS error', err);
-    statusElement('Error');
-  });
+  function stopTranslating() {
+    console.log('Stop clicked');
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    statusElement('Transcribing…');
+    toggleButtons({ stop: true });
+  }
 }
 
-function showPreview(originalText) {
-  statusElement('Preview');
-  document.getElementById('previewOriginal').value = originalText;
-  document.getElementById('previewTranslation').innerHTML = '';
-  document.getElementById('retranslateBtn').disabled = false;
-  document.getElementById('sendBtn').disabled = true;
-  document.getElementById('deleteBtn').disabled = false;
-  toggleButtons({ start: false, stop: true });
+function statusElement(txt) {
+  document.getElementById('status').textContent = txt;
 }
-
-function statusElement(text) {
-  document.getElementById('status').textContent = text;
-}
-
 function toggleButtons({ start, stop }) {
   if (start !== undefined) document.getElementById('start').disabled = start;
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
