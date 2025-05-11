@@ -113,12 +113,7 @@ function createUI() {
 
   // ── Always listen for others in the same room ───────────────────────────
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  /*
-  const listenWs = new WebSocket(
-    `${proto}//${location.host}/ws`
-    `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
-  );
-  */
+
   const listenWs = new WebSocket(
    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
@@ -127,74 +122,50 @@ function createUI() {
 
   listenWs.binaryType = 'arraybuffer';
 
+  // Confirm that this is the listener (not the sendToWhisper socket)
   listenWs.addEventListener('open', () => {
-    console.log('🔔 Listening for others in room:', ROOM);
+    console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
+  });
+  listenWs.addEventListener('close', () => {
+    console.warn('🔔 [listenWs] closed; you’ll need to refresh to rejoin');
   });
 
+  // Log EVERY frame we get, then parse + filter
+  listenWs.addEventListener('message', ({ data }) => {
+    console.log('[DEBUG][listenWs] raw data:', data);
 
+    let msg;
+    try {
+      msg = JSON.parse(data);
+    } catch (e) {
+      console.error('[DEBUG][listenWs] parse error:', e, '— data was:', data);
+      return;
+    }
+    console.log('[DEBUG][listenWs] parsed msg:', msg);
 
-    listenWs.addEventListener('message', ({ data }) => {
-      // 1) Log the raw data we get (could be ArrayBuffer or string)
-      console.log('[DEBUG][listenWs] raw data:', data);
-
-      // 2) Try to parse it as JSON
-      let msg;
-      try {
-        msg = JSON.parse(data);
-      } catch (e) {
-        console.error('[DEBUG][listenWs] JSON parse error:', e, '— data was:', data);
+    if (msg.speaker === 'them') {
+      if (msg.clientId === CLIENT_ID) {
+        console.log('[DEBUG][listenWs] ignoring own broadcast');
         return;
       }
-      console.log('[DEBUG][listenWs] parsed msg:', msg);
-
-      // 3) Only render messages from *others* in the room
-      if (msg.speaker === 'them') {
-        if (msg.clientId === CLIENT_ID) {
-          console.log('[DEBUG][listenWs] ignoring own broadcast');
-          return;
-        }
-        const transcriptDiv = document.getElementById('transcript');
-        const entry = document.createElement('div');
-        entry.innerHTML = `
-          <hr>
-          <p><strong>They said:</strong> ${msg.original}</p>
-          <p><strong>Translation:</strong> ${msg.translation}</p>
-        `;
-        transcriptDiv.append(entry);
-        transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-
-        const utter = new SpeechSynthesisUtterance(msg.translation);
-        utter.lang = currentLang;
-        speechSynthesis.speak(utter);
-      }
-    });
-
-
-
-
-
-  // --- Preview button handlers ---
-/*
-  retranslateBtn.addEventListener('click', async () => {
-    const edited = previewOriginal.value.trim();
-    if (!edited) return;
-    status.textContent = 'Translating…';
-    try {
-      const resp = await fetch('/api/translate-text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: edited, lang: currentLang })
-      });
-      const { translation } = await resp.json();
-      previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${translation}</p>`;
-      status.textContent = 'Preview';
-      sendBtn.disabled = false;
-    } catch (err) {
-      console.error('Translate API error', err);
-      status.textContent = 'Error';
+      // Render “They said: …”
+      const transcriptDiv = document.getElementById('transcript');
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+        <p><strong>Translation:</strong> ${msg.translation}</p>
+      `;
+      transcriptDiv.append(entry);
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+      // Speak it
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      speechSynthesis.speak(utter);
     }
   });
-  */
+
+
   retranslateBtn.addEventListener('click', async () => {
     const edited = previewOriginal.value.trim();
     console.log('[DEBUG] Re-translate clicked, text=', edited);
