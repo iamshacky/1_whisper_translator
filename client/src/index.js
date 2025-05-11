@@ -112,25 +112,21 @@ function createUI() {
   app.append(previewContainer);
 
   // ── Always listen for others in the same room ───────────────────────────
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-
+  const proto   = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const listenWs = new WebSocket(
-   `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+    `${proto}//${location.host}/ws`
+    + `?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
 
-  console.log('🔔 [listener] connecting to', listenWs.url);
-
-  listenWs.binaryType = 'arraybuffer';
-
-  // Confirm that this is the listener (not the sendToWhisper socket)
+  // (A) confirm connect/close on the listener
   listenWs.addEventListener('open', () => {
     console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
   });
   listenWs.addEventListener('close', () => {
-    console.warn('🔔 [listenWs] closed; you’ll need to refresh to rejoin');
+    console.warn('🔔 [listenWs] closed; please refresh to rejoin');
   });
 
-  // Log EVERY frame we get, then parse + filter
+  // (B) log every incoming frame, parse it, then filter/render
   listenWs.addEventListener('message', ({ data }) => {
     console.log('[DEBUG][listenWs] raw data:', data);
 
@@ -148,7 +144,6 @@ function createUI() {
         console.log('[DEBUG][listenWs] ignoring own broadcast');
         return;
       }
-      // Render “They said: …”
       const transcriptDiv = document.getElementById('transcript');
       const entry = document.createElement('div');
       entry.innerHTML = `
@@ -158,12 +153,13 @@ function createUI() {
       `;
       transcriptDiv.append(entry);
       transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-      // Speak it
+
       const utter = new SpeechSynthesisUtterance(msg.translation);
       utter.lang = currentLang;
       speechSynthesis.speak(utter);
     }
   });
+
 
 
   retranslateBtn.addEventListener('click', async () => {
