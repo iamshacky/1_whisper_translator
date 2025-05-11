@@ -16,10 +16,12 @@ export function setupWebSocket(wss) {
     rooms.get(roomId).add(ws);
 
     ws.on('message', async (message) => {
+      console.log('[WS] got message of type', typeof message, 'from', ws.clientId);
       try {
         // Distinguish preview (binary) vs final chat (string)
         if (typeof message === 'string') {
           // FINAL: broadcast original+translation from the sender
+          console.log('[WS] chat broadcast payload:', message);
           const { original, translation, clientId: cid } = JSON.parse(message);
           for (const client of rooms.get(roomId)) {
             if (client.readyState !== ws.OPEN) continue;

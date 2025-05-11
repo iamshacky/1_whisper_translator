@@ -229,6 +229,9 @@ function createUI() {
     speechSynthesis.speak(utter);
 
     // 3) BROADCAST to the room via your listening WS
+    console.log('[DEBUG] Broadcasting via listenWs:', {
+      original, translation, clientId: CLIENT_ID
+    });
     listenWs.send(JSON.stringify({
       original,
       translation,
