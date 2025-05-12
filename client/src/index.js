@@ -325,6 +325,7 @@ function createUI() {
   const listenWs = new WebSocket(
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
+  // we only ever use this one for text broadcasts
   listenWs.binaryType = 'arraybuffer';
 
   listenWs.addEventListener('open', () => {
@@ -390,10 +391,69 @@ function createUI() {
   });
 
   //── Recording → send binary over the same socket ──────────
+  /*
   async function sendToWhisper(blob) {
     statusElement('Transcribing…');
     listenWs.send(blob);
   }
+  */
+
+
+
+
+   //── Recording → NEW ephemeral socket for preview ───────────
+   async function sendToWhisper(blob) {
+     statusElement('Transcribing…');
+ 
+     const previewWs = new WebSocket(
+       `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+     );
+     previewWs.binaryType = 'arraybuffer';
+ 
+     previewWs.addEventListener('open', () => {
+       console.log('[sendToWhisper] WS open – sending audio blob');
+       previewWs.send(blob);
+     });
+ 
+     previewWs.addEventListener('message', ({ data }) => {
+       const msg = JSON.parse(data);
+       if (msg.speaker === 'you') {
+         // —— PREVIEW —— 
+         previewOriginal.value = msg.original;
+         previewTranslation.innerHTML = `
+           <p>
+             <strong>Translation:</strong> ${msg.translation}
+             <button id="playPreviewBtn">🔊 Play</button>
+             <audio 
+               id="previewAudio"
+               src="data:audio/mpeg;base64,${msg.audio}"
+             ></audio>
+           </p>
+         `;
+         // wire up the play button under user gesture
+         previewTranslation
+           .querySelector('#playPreviewBtn')
+           .addEventListener('click', () =>
+             document.getElementById('previewAudio').play()
+           );
+ 
+         // enable the preview controls
+         retranslateBtn.disabled = false;
+         sendBtn.disabled       = false;
+         deleteBtn.disabled     = false;
+         toggleButtons({ start: false, stop: true });
+         statusElement('Preview');
+ 
+         // done with this socket
+         previewWs.close();
+       }
+     });
+ 
+     previewWs.addEventListener('error', err => {
+       console.error('[sendToWhisper] WS error', err);
+       statusElement('Error');
+     });
+   }
 
   //── Recording controls ──────────────────────────────────
   async function startTranslating() {
