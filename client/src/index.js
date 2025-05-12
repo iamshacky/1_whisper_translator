@@ -131,6 +131,7 @@ function createUI() {
   app.append(previewContainer);
 
   //── Always listen for broadcasts ────────────────────────
+  /*
   const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const listenWs = new WebSocket(
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
@@ -318,6 +319,80 @@ function createUI() {
       console.error('WS error', err);
       statusElement('Error');
     });
+  }
+  */
+  const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const listenWs = new WebSocket(
+    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
+  );
+  listenWs.binaryType = 'arraybuffer';
+
+  listenWs.addEventListener('open', () => {
+    console.log('🔔 [listenWs] connected');
+  });
+
+  listenWs.addEventListener('message', ({ data }) => {
+    const msg = JSON.parse(data);
+
+    if (msg.speaker === 'you') {
+      // —— PREVIEW —— 
+      previewOriginal.value = msg.original;
+      previewTranslation.innerHTML = `
+        <p>
+          <strong>Translation:</strong> ${msg.translation}
+          <button id="playPreviewBtn">🔊 Play</button>
+          <audio 
+            id="previewAudio"
+            src="data:audio/mpeg;base64,${msg.audio}"
+          ></audio>
+        </p>
+      `;
+
+      // user-gesture playback
+      previewTranslation
+        .querySelector('#playPreviewBtn')
+        .addEventListener('click', () =>
+          document.getElementById('previewAudio').play()
+        );
+
+      // enable the controls
+      retranslateBtn.disabled = false;
+      sendBtn.disabled       = false;
+      deleteBtn.disabled     = false;
+      toggleButtons({ start: false, stop: true });
+      statusElement('Preview');
+    }
+    else if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+      // —— BROADCAST CHAT —— 
+      let audioHtml = '';
+      if (msg.audio) {
+        audioHtml = `
+          <button class="play-btn">🔊 Play</button>
+          <audio class="chat-audio"
+                 src="data:audio/mpeg;base64,${msg.audio}"></audio>
+        `;
+      }
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+        <p><strong>Translation:</strong> ${msg.translation}</p>
+        ${audioHtml}
+      `;
+      transcript.append(entry);
+
+      if (msg.audio) {
+        entry.querySelector('.play-btn').addEventListener('click', () =>
+          entry.querySelector('.chat-audio').play()
+        );
+      }
+    }
+  });
+
+  //── Recording → send binary over the same socket ──────────
+  async function sendToWhisper(blob) {
+    statusElement('Transcribing…');
+    listenWs.send(blob);
   }
 
   //── Recording controls ──────────────────────────────────
