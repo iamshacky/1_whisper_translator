@@ -130,7 +130,7 @@ function createUI() {
     console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
   });
 
-  // …inside createUI(), after you open listenWs…
+  // …after you’ve created & opened your `listenWs`…
   listenWs.addEventListener('message', ({ data }) => {
     let msg;
     try {
@@ -140,7 +140,7 @@ function createUI() {
     }
 
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-      // Render the incoming chat entry
+      // 1) render the incoming chat bubble
       const entry = document.createElement('div');
       entry.innerHTML = `
         <hr>
@@ -150,11 +150,15 @@ function createUI() {
       transcript.append(entry);
       transcript.scrollTop = transcript.scrollHeight;
 
-      // Just speak—no cancel()
-      speak(msg.translation);
+      // 2) speak the translation
+      const utter = new SpeechSynthesisUtterance(msg.translation);
+      utter.lang = currentLang;
+      const v = pickVoice(currentLang);
+      if (v) utter.voice = v;
+      speechSynthesis.speak(utter);
     }
   });
-
+  // …next handler, e.g. your retranslateBtn listener…
 
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
@@ -196,7 +200,7 @@ function createUI() {
                           .replace(/^Translation:/, '')
                           .trim();
 
-    // Local echo
+    // 1) Local echo …
     const entry = document.createElement('div');
     entry.innerHTML = `
       <hr>
@@ -206,16 +210,21 @@ function createUI() {
     transcript.append(entry);
     transcript.scrollTop = transcript.scrollHeight;
 
-    // Speak it, then mark Idle when done:
-    speak(translation, () => statusElement('Idle'));
+    // 2) Speak under *user gesture* so audio is allowed
+    const utter = new SpeechSynthesisUtterance(translation);
+    utter.lang = currentLang;
+    const v = pickVoice(currentLang);
+    if (v) utter.voice = v;
+    utter.onend = () => statusElement('Idle');
+    speechSynthesis.speak(utter);
 
-    // Broadcast
+    // 3) Broadcast …
     console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
     listenWs.send(JSON.stringify({ original, translation, clientId: CLIENT_ID }));
 
-    // Reset preview
+    // 4) Reset preview …
     statusElement('Idle');
-    previewOriginal.value = '';
+    previewOriginal.value     = '';
     previewTranslation.innerHTML = '';
     retranslateBtn.disabled = true;
     sendBtn.disabled = true;
