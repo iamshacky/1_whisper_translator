@@ -11,13 +11,14 @@ let mediaRecorder;
 let audioChunks = [];
 let currentLang = 'es';
 
- console.log('Module loaded: /src/index.js');
- 
-// ── load available TTS voices once they’re ready ─────────────────────────────
-let availableVoices = [];
+console.log('Module loaded: /src/index.js');
+
+// ── load available TTS voices once they’re ready
+let availableVoices = speechSynthesis.getVoices();
 speechSynthesis.addEventListener('voiceschanged', () => {
   availableVoices = speechSynthesis.getVoices();
 });
+
 
 function pickVoice(lang) {
   return availableVoices.find(v => v.lang === lang)
@@ -25,26 +26,16 @@ function pickVoice(lang) {
       || null;
 }
 
-function speak(text) {
-  /*
+function speak(text, onend) {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = currentLang;
   const v = pickVoice(currentLang);
   if (v) utter.voice = v;
-  speechSynthesis.cancel();                // clear any queued utterances
-  speechSynthesis.speak(utter);
-  */ 
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = currentLang;
-  const v = pickVoice(currentLang);
-  if (v) utter.voice = v;
-  // if caller passed a callback, hook it up
-  if (typeof arguments[1] === 'function') {
-    utter.addEventListener('end', arguments[1]);
+  if (typeof onend === 'function') {
+    utter.addEventListener('end', onend);
   }
-  speechSynthesis.cancel();                // clear any queued utterances
   speechSynthesis.speak(utter);
-   return utter;
+  return utter;
 }
 
 function createUI() {
@@ -138,12 +129,18 @@ function createUI() {
   listenWs.addEventListener('open', () => {
     console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
   });
+
+  // …inside createUI(), after you open listenWs…
   listenWs.addEventListener('message', ({ data }) => {
     let msg;
-    try { msg = JSON.parse(data); }
-    catch (e) { return console.error('Bad JSON', e, 'data:', data); }
+    try {
+      msg = JSON.parse(data);
+    } catch (e) {
+      return console.error('Bad JSON', e, 'data:', data);
+    }
 
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+      // Render the incoming chat entry
       const entry = document.createElement('div');
       entry.innerHTML = `
         <hr>
@@ -153,14 +150,11 @@ function createUI() {
       transcript.append(entry);
       transcript.scrollTop = transcript.scrollHeight;
 
-      // clear out any queued speech
-      speechSynthesis.cancel();
-      //const utter = new SpeechSynthesisUtterance(msg.translation);
-      //utter.lang = currentLang;
-      //speechSynthesis.speak(utter);
+      // Just speak—no cancel()
       speak(msg.translation);
     }
   });
+
 
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
@@ -212,13 +206,7 @@ function createUI() {
     transcript.append(entry);
     transcript.scrollTop = transcript.scrollHeight;
 
-    // Speak
-    //speechSynthesis.cancel();
-    //utter.lang  = currentLang;
-    //speak(translation);
-    //utter.onend = () => statusElement('Idle');
-
-    // Speak, and reset status when done
+    // Speak it, then mark Idle when done:
     speak(translation, () => statusElement('Idle'));
 
     // Broadcast
