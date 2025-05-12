@@ -20,20 +20,31 @@ speechSynthesis.addEventListener('voiceschanged', () => {
 });
 
 
+// — better pickVoice with fallback —
 function pickVoice(lang) {
-  return availableVoices.find(v => v.lang === lang)
-      || availableVoices.find(v => v.lang.startsWith(lang))
-      || null;
+  const voices = availableVoices;
+  // exact match e.g. 'es-ES'
+  let v = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase());
+  if (!v) {
+    // prefix match: 'es'
+    v = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+  }
+  if (!v) {
+    // fallback to the browser default voice
+    v = voices.find(v => v.default) || voices[0];
+    console.warn(`No TTS voice for "${lang}", falling back to "${v.lang}" (${v.name})`);
+  }
+  return v;
 }
 
+// — unified speak() that sets voice.lang correctly —
 function speak(text, onend) {
   const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = currentLang;
   const v = pickVoice(currentLang);
-  if (v) utter.voice = v;
-  if (typeof onend === 'function') {
-    utter.addEventListener('end', onend);
-  }
+  utter.voice = v;
+  // use the voice's actual BCP-47 locale
+  utter.lang = v.lang;
+  if (typeof onend === 'function') utter.addEventListener('end', onend);
   speechSynthesis.speak(utter);
   return utter;
 }
@@ -253,20 +264,6 @@ function createUI() {
 
     /*
     ws.addEventListener('message', ({ data }) => {
-      const msg = JSON.parse(data);
-      if (msg.speaker === 'you') {
-        previewOriginal.value = msg.original;
-        previewTranslation.innerHTML = '';
-        retranslateBtn.disabled = false;
-        sendBtn.disabled = true;
-        deleteBtn.disabled = false;
-        toggleButtons({ start: false, stop: true });
-        statusElement('Preview');
-        ws.close();
-      }
-    });
-    */
-    ws.addEventListener('message', ({ data }) => {
       console.log('[sendToWhisper] got preview:', data);
       const msg = JSON.parse(data);
       if (msg.speaker === 'you') {
@@ -287,6 +284,38 @@ function createUI() {
         ws.close();
       }
     });
+    */
+    ws.addEventListener('message', ({ data }) => {
+      console.log('[sendToWhisper] got preview:', data);
+      const msg = JSON.parse(data);
+      if (msg.speaker === 'you') {
+        // 1) show Whisper’s text
+        previewOriginal.value = msg.original;
+
+        // 2) show GPT translation + Play button
+        previewTranslation.innerHTML = `
+          <p><strong>Translation:</strong> ${msg.translation}
+            <button id="playPreviewBtn" title="Play preview">🔊</button>
+          </p>
+        `;
+
+        // wire up the preview play button under a click gesture
+        previewTranslation
+          .querySelector('#playPreviewBtn')
+          .addEventListener('click', () => speak(msg.translation));
+
+        // 3) enable buttons now that translation exists
+        retranslateBtn.disabled = false;
+        sendBtn.disabled       = false;
+        deleteBtn.disabled     = false;
+
+        toggleButtons({ start: false, stop: true });
+        statusElement('Preview');
+        ws.close();
+      }
+    });
+
+
 
     ws.addEventListener('error', err => {
       console.error('WS error', err);
