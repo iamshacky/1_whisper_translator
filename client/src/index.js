@@ -131,46 +131,30 @@ function createUI() {
   });
 
   // …after you’ve created & opened your `listenWs`…
-  // …after you’ve created & opened your `listenWs`…
-  listenWs.addEventListener('message', ({ data }) => {
-    const msg = JSON.parse(data);
+  +listenWs.addEventListener('message', ({ data }) => {
+     const msg = JSON.parse(data);
+     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+       const entry = document.createElement('div');
+       entry.innerHTML = `
+         <hr>
+         <p><strong>They said:</strong> ${msg.original}</p>
+         <p>
+           <strong>Translation:</strong> ${msg.translation}
+           <button class="play-btn" title="Play translation">🔊</button>
+         </p>
+       `;
+       transcript.append(entry);
+       transcript.scrollTop = transcript.scrollHeight;
  
-    if (msg.speaker === 'you') {
-      // —— PREVIEW from Whisper + initial GPT translation —— 
-      previewOriginal.value        = msg.original;
-      previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${msg.translation}</p>`;
-      retranslateBtn.disabled      = false; // optional: still let them tweak
-      sendBtn.disabled             = false; // now they can send immediately
-      deleteBtn.disabled           = false;
-      toggleButtons({ start: false, stop: true });
-      statusElement('Preview');
-      ws.close();
-    }
- 
-    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-      // —— FINAL CHAT from someone else —— 
-      const entry = document.createElement('div');
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-        <p>
-          <strong>Translation:</strong> ${msg.translation}
-          <button class="play-btn" title="Play translation">🔊</button>
-        </p>
-      `;
-      transcript.append(entry);
-      transcript.scrollTop = transcript.scrollHeight;
- 
-      // play under user gesture
-      entry.querySelector('.play-btn').addEventListener('click', () => {
-        const utter = new SpeechSynthesisUtterance(msg.translation);
-        utter.lang = currentLang;
-        const v = pickVoice(currentLang);
-        if (v) utter.voice = v;
-        speechSynthesis.speak(utter);
-      });
-    }
-  });
+       entry.querySelector('.play-btn').addEventListener('click', () => {
+         const utter = new SpeechSynthesisUtterance(msg.translation);
+         utter.lang = currentLang;
+         const v = pickVoice(currentLang);
+         if (v) utter.voice = v;
+         speechSynthesis.speak(utter);
+       });
+     }
+   });
   
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
@@ -255,7 +239,7 @@ function createUI() {
     sendBtn.disabled             = true;
     deleteBtn.disabled           = true;
   });
-
+ 
   //── Inside createUI: only one sendToWhisper ─────────────
   async function sendToWhisper(blob) {
     statusElement('Transcribing…');
@@ -269,6 +253,7 @@ function createUI() {
       ws.send(blob);
     });
 
+    /*
     ws.addEventListener('message', ({ data }) => {
       const msg = JSON.parse(data);
       if (msg.speaker === 'you') {
@@ -277,6 +262,22 @@ function createUI() {
         retranslateBtn.disabled = false;
         sendBtn.disabled = true;
         deleteBtn.disabled = false;
+        toggleButtons({ start: false, stop: true });
+        statusElement('Preview');
+        ws.close();
+      }
+    });
+    */
+    ws.addEventListener('message', ({ data }) => {
+      const msg = JSON.parse(data);
+      if (msg.speaker === 'you') {
+        // Show Whisper’s text + GPT translation in preview
+        previewOriginal.value = msg.original;
+        previewTranslation.innerHTML =
+          `<p><strong>Translation:</strong> ${msg.translation}</p>`;
+        retranslateBtn.disabled = false;
+        sendBtn.disabled       = false;
+        deleteBtn.disabled     = false;
         toggleButtons({ start: false, stop: true });
         statusElement('Preview');
         ws.close();
@@ -329,6 +330,7 @@ function toggleButtons({ start, stop }) {
 }
 
 // wait for the voices to be ready before building the UI
+/*
 window.addEventListener('load', async () => {
   await new Promise(resolve => {
     const vs = speechSynthesis.getVoices();
@@ -338,4 +340,14 @@ window.addEventListener('load', async () => {
   availableVoices = speechSynthesis.getVoices();
   createUI();
 });
-
+*/
+window.addEventListener('load', async () => {
+  await new Promise(resolve => {
+    const vs = speechSynthesis.getVoices();
+    if (vs.length) return resolve();
+    speechSynthesis.addEventListener('voiceschanged', resolve, { once: true });
+  });
+  availableVoices = speechSynthesis.getVoices();
++ console.log('Available TTS voices:', availableVoices);
+  createUI();
+});
