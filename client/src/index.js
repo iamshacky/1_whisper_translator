@@ -11,6 +11,29 @@ let mediaRecorder;
 let audioChunks = [];
 let currentLang = 'es';
 
+ console.log('Module loaded: /src/index.js');
+ 
+// ── load available TTS voices once they’re ready ─────────────────────────────
+let availableVoices = [];
+speechSynthesis.addEventListener('voiceschanged', () => {
+  availableVoices = speechSynthesis.getVoices();
+});
+
+function pickVoice(lang) {
+  return availableVoices.find(v => v.lang === lang)
+      || availableVoices.find(v => v.lang.startsWith(lang))
+      || null;
+}
+
+function speak(text) {
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = currentLang;
+  const v = pickVoice(currentLang);
+  if (v) utter.voice = v;
+  speechSynthesis.cancel();                // clear any queued utterances
+  speechSynthesis.speak(utter);
+}
+
 function createUI() {
   const app = document.getElementById('app');
 
@@ -116,22 +139,13 @@ function createUI() {
       `;
       transcript.append(entry);
       transcript.scrollTop = transcript.scrollHeight;
-      /*
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
-      */
-      /*
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
-      */
 
       // clear out any queued speech
       speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      speechSynthesis.speak(utter);
+      //const utter = new SpeechSynthesisUtterance(msg.translation);
+      //utter.lang = currentLang;
+      //speechSynthesis.speak(utter);
+      speak(msg.translation);
     }
   });
 
@@ -186,22 +200,11 @@ function createUI() {
     transcript.scrollTop = transcript.scrollHeight;
 
     // Speak
-    /*
-    const utter = new SpeechSynthesisUtterance(translation);
-    utter.onend = () => statusElement('Idle');
-    speechSynthesis.speak(utter);
-    */
-    /*
-    const utter = new SpeechSynthesisUtterance(translation);
-    utter.onend = () => statusElement('Idle');
-    speechSynthesis.speak(utter);
-    */
-    // clear any queued speech, then speak
     speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(translation);
+
     utter.lang  = currentLang;
-    utter.onend = () => { status.textContent = 'Idle'; };
-    speechSynthesis.speak(utter);
+    speak(translation);
+    utter.onend = () => statusElement('Idle');
 
     // Broadcast
     console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
