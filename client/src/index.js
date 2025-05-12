@@ -26,12 +26,25 @@ function pickVoice(lang) {
 }
 
 function speak(text) {
+  /*
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = currentLang;
   const v = pickVoice(currentLang);
   if (v) utter.voice = v;
   speechSynthesis.cancel();                // clear any queued utterances
   speechSynthesis.speak(utter);
+  */ 
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = currentLang;
+  const v = pickVoice(currentLang);
+  if (v) utter.voice = v;
+  // if caller passed a callback, hook it up
+  if (typeof arguments[1] === 'function') {
+    utter.addEventListener('end', arguments[1]);
+  }
+  speechSynthesis.cancel();                // clear any queued utterances
+  speechSynthesis.speak(utter);
+   return utter;
 }
 
 function createUI() {
@@ -200,11 +213,13 @@ function createUI() {
     transcript.scrollTop = transcript.scrollHeight;
 
     // Speak
-    speechSynthesis.cancel();
+    //speechSynthesis.cancel();
+    //utter.lang  = currentLang;
+    //speak(translation);
+    //utter.onend = () => statusElement('Idle');
 
-    utter.lang  = currentLang;
-    speak(translation);
-    utter.onend = () => statusElement('Idle');
+    // Speak, and reset status when done
+    speak(translation, () => statusElement('Idle'));
 
     // Broadcast
     console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
