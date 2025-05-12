@@ -139,6 +139,7 @@ function createUI() {
       return console.error('Bad JSON', e, 'data:', data);
     }
 
+    /*
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
       // 1) render the incoming chat bubble
       const entry = document.createElement('div');
@@ -156,6 +157,30 @@ function createUI() {
       const v = pickVoice(currentLang);
       if (v) utter.voice = v;
       speechSynthesis.speak(utter);
+    }
+    */
+    // …inside listenWs.addEventListener('message', …)
+    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+        <p>
+          <strong>Translation:</strong> ${msg.translation}
+          <button class="play-btn" title="Play translation">🔊</button>
+        </p>
+      `;
+      transcript.append(entry);
+      transcript.scrollTop = transcript.scrollHeight;
+
+      // wire up Play button under user gesture
+      entry.querySelector('.play-btn').addEventListener('click', () => {
+        const utter = new SpeechSynthesisUtterance(msg.translation);
+        utter.lang = currentLang;
+        const v = pickVoice(currentLang);
+        if (v) utter.voice = v;
+        speechSynthesis.speak(utter);
+      });
     }
   });
   // …next handler, e.g. your retranslateBtn listener…
@@ -210,13 +235,7 @@ function createUI() {
     transcript.append(entry);
     transcript.scrollTop = transcript.scrollHeight;
 
-    // 2) Speak under *user gesture* so audio is allowed
-    const utter = new SpeechSynthesisUtterance(translation);
-    utter.lang = currentLang;
-    const v = pickVoice(currentLang);
-    if (v) utter.voice = v;
-    utter.onend = () => statusElement('Idle');
-    speechSynthesis.speak(utter);
+    speak(translation, () => statusElement('Idle'));
 
     // 3) Broadcast …
     console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
@@ -303,4 +322,14 @@ function toggleButtons({ start, stop }) {
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
 }
 
-window.addEventListener('load', createUI);
+window.addEventListener('load', async () => {
+  // wait for voices to be populated
+  await new Promise(resolve => {
+    const vs = speechSynthesis.getVoices();
+    if (vs.length) return resolve();
+    speechSynthesis.addEventListener('voiceschanged', resolve, { once: true });
+  });
+  availableVoices = speechSynthesis.getVoices();
+  createUI();
+});
+
