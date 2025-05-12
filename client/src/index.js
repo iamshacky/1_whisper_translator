@@ -164,8 +164,6 @@ function createUI() {
   });
   
 
-
-
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
     const edited = previewOriginal.value.trim();
