@@ -131,36 +131,24 @@ function createUI() {
   });
 
   // …after you’ve created & opened your `listenWs`…
+  // …after you’ve created & opened your `listenWs`…
   listenWs.addEventListener('message', ({ data }) => {
-    let msg;
-    try {
-      msg = JSON.parse(data);
-    } catch (e) {
-      return console.error('Bad JSON', e, 'data:', data);
+    const msg = JSON.parse(data);
+ 
+    if (msg.speaker === 'you') {
+      // —— PREVIEW from Whisper + initial GPT translation —— 
+      previewOriginal.value        = msg.original;
+      previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${msg.translation}</p>`;
+      retranslateBtn.disabled      = false; // optional: still let them tweak
+      sendBtn.disabled             = false; // now they can send immediately
+      deleteBtn.disabled           = false;
+      toggleButtons({ start: false, stop: true });
+      statusElement('Preview');
+      ws.close();
     }
-
-    /*
+ 
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-      // 1) render the incoming chat bubble
-      const entry = document.createElement('div');
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-        <p><strong>Translation:</strong> ${msg.translation}</p>
-      `;
-      transcript.append(entry);
-      transcript.scrollTop = transcript.scrollHeight;
-
-      // 2) speak the translation
-      const utter = new SpeechSynthesisUtterance(msg.translation);
-      utter.lang = currentLang;
-      const v = pickVoice(currentLang);
-      if (v) utter.voice = v;
-      speechSynthesis.speak(utter);
-    }
-    */
-    // …inside listenWs.addEventListener('message', …)
-    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+      // —— FINAL CHAT from someone else —— 
       const entry = document.createElement('div');
       entry.innerHTML = `
         <hr>
@@ -172,8 +160,8 @@ function createUI() {
       `;
       transcript.append(entry);
       transcript.scrollTop = transcript.scrollHeight;
-
-      // wire up Play button under user gesture
+ 
+      // play under user gesture
       entry.querySelector('.play-btn').addEventListener('click', () => {
         const utter = new SpeechSynthesisUtterance(msg.translation);
         utter.lang = currentLang;
@@ -183,8 +171,7 @@ function createUI() {
       });
     }
   });
-  // …next handler, e.g. your retranslateBtn listener…
-
+  
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
     const edited = previewOriginal.value.trim();
@@ -218,13 +205,32 @@ function createUI() {
   });
 
   //── Send final message ──────────────────────────────────
-  sendBtn.addEventListener('click', () => {
-    const original    = previewOriginal.value.trim();
-    const translation = previewTranslation
-                          .textContent
+  //── Send final message (auto-translate if needed) ───────────────────
+  sendBtn.addEventListener('click', async () => {
+    const original = previewOriginal.value.trim();
+    let translation = previewTranslation.textContent
                           .replace(/^Translation:/, '')
                           .trim();
-
+ 
+    // if the server-side preview didn’t fill it, do one more translate step
+    if (!translation) {
+      statusElement('Translating…');
+      try {
+        const resp = await fetch('/api/translate-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: original, lang: currentLang })
+        });
+        if (!resp.ok) throw new Error(resp.status);
+        const { translation: tx } = await resp.json();
+        translation = tx;
+        previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${translation}</p>`;
+      } catch (err) {
+        console.error('Translate error', err);
+        return statusElement('Error');
+      }
+    }
+ 
     // 1) Local echo …
     const entry = document.createElement('div');
     entry.innerHTML = `
@@ -234,20 +240,20 @@ function createUI() {
     `;
     transcript.append(entry);
     transcript.scrollTop = transcript.scrollHeight;
-
+ 
+    // 2) TTS under the click gesture
     speak(translation, () => statusElement('Idle'));
-
-    // 3) Broadcast …
-    console.log('📡 Broadcasting:', { original, translation, clientId: CLIENT_ID });
+ 
+    // 3) Broadcast to others
     listenWs.send(JSON.stringify({ original, translation, clientId: CLIENT_ID }));
-
-    // 4) Reset preview …
+ 
+    // 4) Reset preview
     statusElement('Idle');
-    previewOriginal.value     = '';
+    previewOriginal.value        = '';
     previewTranslation.innerHTML = '';
-    retranslateBtn.disabled = true;
-    sendBtn.disabled = true;
-    deleteBtn.disabled = true;
+    retranslateBtn.disabled      = true;
+    sendBtn.disabled             = true;
+    deleteBtn.disabled           = true;
   });
 
   //── Inside createUI: only one sendToWhisper ─────────────
@@ -322,8 +328,8 @@ function toggleButtons({ start, stop }) {
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
 }
 
+// wait for the voices to be ready before building the UI
 window.addEventListener('load', async () => {
-  // wait for voices to be populated
   await new Promise(resolve => {
     const vs = speechSynthesis.getVoices();
     if (vs.length) return resolve();
