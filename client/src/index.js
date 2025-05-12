@@ -131,7 +131,7 @@ function createUI() {
   });
 
   // …after you’ve created & opened your `listenWs`…
-  +listenWs.addEventListener('message', ({ data }) => {
+  listenWs.addEventListener('message', ({ data }) => {
      const msg = JSON.parse(data);
      if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
        const entry = document.createElement('div');
@@ -330,7 +330,6 @@ function toggleButtons({ start, stop }) {
 }
 
 // wait for the voices to be ready before building the UI
-/*
 window.addEventListener('load', async () => {
   await new Promise(resolve => {
     const vs = speechSynthesis.getVoices();
@@ -338,16 +337,6 @@ window.addEventListener('load', async () => {
     speechSynthesis.addEventListener('voiceschanged', resolve, { once: true });
   });
   availableVoices = speechSynthesis.getVoices();
-  createUI();
-});
-*/
-window.addEventListener('load', async () => {
-  await new Promise(resolve => {
-    const vs = speechSynthesis.getVoices();
-    if (vs.length) return resolve();
-    speechSynthesis.addEventListener('voiceschanged', resolve, { once: true });
-  });
-  availableVoices = speechSynthesis.getVoices();
-+ console.log('Available TTS voices:', availableVoices);
+  console.log('Available TTS voices:', availableVoices);
   createUI();
 });
