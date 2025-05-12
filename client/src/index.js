@@ -132,29 +132,27 @@ function createUI() {
 
   // …after you’ve created & opened your `listenWs`…
   listenWs.addEventListener('message', ({ data }) => {
-     const msg = JSON.parse(data);
-     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-       const entry = document.createElement('div');
-       entry.innerHTML = `
-         <hr>
-         <p><strong>They said:</strong> ${msg.original}</p>
-         <p>
-           <strong>Translation:</strong> ${msg.translation}
-           <button class="play-btn" title="Play translation">🔊</button>
-         </p>
-       `;
-       transcript.append(entry);
-       transcript.scrollTop = transcript.scrollHeight;
- 
-       entry.querySelector('.play-btn').addEventListener('click', () => {
-         const utter = new SpeechSynthesisUtterance(msg.translation);
-         utter.lang = currentLang;
-         const v = pickVoice(currentLang);
-         if (v) utter.voice = v;
-         speechSynthesis.speak(utter);
-       });
-     }
-   });
+    const msg = JSON.parse(data);
+    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+      const entry = document.createElement('div');
+      entry.innerHTML = `
+        <hr>
+        <p><strong>They said:</strong> ${msg.original}</p>
+        <p>
+          <strong>Translation:</strong> ${msg.translation}
+          <button class="play-btn">🔊</button>
+        </p>
+      `;
+      transcript.append(entry);
+      entry.querySelector('.play-btn').addEventListener('click', () => {
+        const u = new SpeechSynthesisUtterance(msg.translation);
+        u.lang = currentLang;
+        const v = pickVoice(currentLang);
+        if (v) u.voice = v;
+        speechSynthesis.speak(u);
+      });
+    }
+  });
   
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
@@ -269,15 +267,21 @@ function createUI() {
     });
     */
     ws.addEventListener('message', ({ data }) => {
+      console.log('[sendToWhisper] got preview:', data);
       const msg = JSON.parse(data);
       if (msg.speaker === 'you') {
-        // Show Whisper’s text + GPT translation in preview
+        // 1) show Whisper’s text
         previewOriginal.value = msg.original;
+
+        // 2) show GPT translation immediately
         previewTranslation.innerHTML =
           `<p><strong>Translation:</strong> ${msg.translation}</p>`;
+
+        // 3) enable buttons only once we have translation
         retranslateBtn.disabled = false;
         sendBtn.disabled       = false;
         deleteBtn.disabled     = false;
+
         toggleButtons({ start: false, stop: true });
         statusElement('Preview');
         ws.close();
