@@ -26,6 +26,7 @@ export function setupWebSocket(wss) {
     ws.on('message', async (message, isBinary) => {
       console.log('[WS] got', isBinary ? 'binary' : 'string', 'from', clientId);
       try {
+        /*
         if (isBinary) {
           // —— PREVIEW only —— transcribe & translate, send back to sender
           const { text, translation } = await translateController(
@@ -38,6 +39,20 @@ export function setupWebSocket(wss) {
             translation,
             clientId
           }));
+        */
+        if (isBinary) {
+            // —— PREVIEW: transcribe, translate & TTS —— 
+            const { text, translation, audio } = await translateController(
+              Buffer.from(message),
+              targetLang
+            );
+            ws.send(JSON.stringify({
+              speaker:    'you',
+              original:   text,
+              translation,
+              audio,       // base64 MP3
+              clientId
+            }));
         } else {
           // —— FINAL CHAT —— broadcast to everyone in room
           const { original, translation, clientId: senderId } = JSON.parse(message.toString());

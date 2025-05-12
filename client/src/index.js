@@ -151,20 +151,21 @@ function createUI() {
         <p><strong>They said:</strong> ${msg.original}</p>
         <p>
           <strong>Translation:</strong> ${msg.translation}
-          <button class="play-btn">🔊</button>
+          <button class="play-btn">🔊 Play</button>
+          <audio class="chat-audio" src="data:audio/mpeg;base64,${msg.audio}"></audio>
         </p>
       `;
       transcript.append(entry);
-      entry.querySelector('.play-btn').addEventListener('click', () => {
-        const u = new SpeechSynthesisUtterance(msg.translation);
-        u.lang = currentLang;
-        const v = pickVoice(currentLang);
-        if (v) u.voice = v;
-        speechSynthesis.speak(u);
-      });
+      entry.querySelector('.play-btn').addEventListener('click', () =>
+        entry.querySelector('.chat-audio').play()
+      );
     }
+
   });
   
+
+
+
   //── Preview → re-translate/Edit ────────────────────────
   retranslateBtn.addEventListener('click', async () => {
     const edited = previewOriginal.value.trim();
@@ -270,28 +271,6 @@ function createUI() {
         // 1) show Whisper’s text
         previewOriginal.value = msg.original;
 
-        // 2) show GPT translation immediately
-        previewTranslation.innerHTML =
-          `<p><strong>Translation:</strong> ${msg.translation}</p>`;
-
-        // 3) enable buttons only once we have translation
-        retranslateBtn.disabled = false;
-        sendBtn.disabled       = false;
-        deleteBtn.disabled     = false;
-
-        toggleButtons({ start: false, stop: true });
-        statusElement('Preview');
-        ws.close();
-      }
-    });
-    */
-    ws.addEventListener('message', ({ data }) => {
-      console.log('[sendToWhisper] got preview:', data);
-      const msg = JSON.parse(data);
-      if (msg.speaker === 'you') {
-        // 1) show Whisper’s text
-        previewOriginal.value = msg.original;
-
         // 2) show GPT translation + Play button
         previewTranslation.innerHTML = `
           <p><strong>Translation:</strong> ${msg.translation}
@@ -314,6 +293,40 @@ function createUI() {
         ws.close();
       }
     });
+    */
+    ws.addEventListener('message', ({ data }) => {
+      const msg = JSON.parse(data);
+      if (msg.speaker === 'you') {
+        // ── text UI ───────────────────────────
+        previewOriginal.value = msg.original;
+        previewTranslation.innerHTML = `
+          <p>
+            <strong>Translation:</strong> ${msg.translation}
+            <button id="playPreviewBtn">🔊 Play</button>
+            <audio 
+              id="previewAudio"
+              src="data:audio/mpeg;base64,${msg.audio}"
+            ></audio>
+          </p>
+        `;
+
+        // ── wire up play under a click gesture ─── 
+        previewTranslation
+          .querySelector('#playPreviewBtn')
+          .addEventListener('click', () => {
+            document.getElementById('previewAudio').play();
+          });
+
+        // …then enable buttons as before…
+        retranslateBtn.disabled = false;
+        sendBtn.disabled       = false;
+        deleteBtn.disabled     = false;
+        toggleButtons({ start: false, stop: true });
+        statusElement('Preview');
+        ws.close();
+      }
+    });
+
 
 
 
