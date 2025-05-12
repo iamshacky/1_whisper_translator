@@ -261,38 +261,8 @@ function createUI() {
       ws.send(blob);
     });
 
-    /*
     ws.addEventListener('message', ({ data }) => {
-      console.log('[sendToWhisper] got preview:', data);
-      const msg = JSON.parse(data);
-      if (msg.speaker === 'you') {
-        // 1) show Whisper’s text
-        previewOriginal.value = msg.original;
-
-        // 2) show GPT translation + Play button
-        previewTranslation.innerHTML = `
-          <p><strong>Translation:</strong> ${msg.translation}
-            <button id="playPreviewBtn" title="Play preview">🔊</button>
-          </p>
-        `;
-
-        // wire up the preview play button under a click gesture
-        previewTranslation
-          .querySelector('#playPreviewBtn')
-          .addEventListener('click', () => speak(msg.translation));
-
-        // 3) enable buttons now that translation exists
-        retranslateBtn.disabled = false;
-        sendBtn.disabled       = false;
-        deleteBtn.disabled     = false;
-
-        toggleButtons({ start: false, stop: true });
-        statusElement('Preview');
-        ws.close();
-      }
-    });
-    */
-    ws.addEventListener('message', ({ data }) => {
+      console.log('[sendToWhisper] raw message:', data);
       const msg = JSON.parse(data);
       if (msg.speaker === 'you') {
         // ── text UI ───────────────────────────

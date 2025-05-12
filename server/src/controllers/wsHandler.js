@@ -26,26 +26,15 @@ export function setupWebSocket(wss) {
     ws.on('message', async (message, isBinary) => {
       console.log('[WS] got', isBinary ? 'binary' : 'string', 'from', clientId);
       try {
-        /*
-        if (isBinary) {
-          // —— PREVIEW only —— transcribe & translate, send back to sender
-          const { text, translation } = await translateController(
-            Buffer.from(message),
-            targetLang
-          );
-          ws.send(JSON.stringify({
-            speaker:    'you',
-            original:   text,
-            translation,
-            clientId
-          }));
-        */
         if (isBinary) {
             // —— PREVIEW: transcribe, translate & TTS —— 
             const { text, translation, audio } = await translateController(
               Buffer.from(message),
               targetLang
             );
+
+            console.log('[WS] sending preview back:', { text, translation, audio: audio.slice(0,20) + '…' });
+            
             ws.send(JSON.stringify({
               speaker:    'you',
               original:   text,
