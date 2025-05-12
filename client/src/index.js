@@ -144,23 +144,38 @@ function createUI() {
   // …after you’ve created & opened your `listenWs`…
   listenWs.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
+    
     if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
       const entry = document.createElement('div');
+
+      // build the HTML with an optional audio section
+      let audioHtml = '';
+      if (msg.audio) {
+        audioHtml = `
+          <button class="play-btn">🔊 Play</button>
+          <audio class="chat-audio"
+                src="data:audio/mpeg;base64,${msg.audio}">
+          </audio>
+        `;
+      }
+
       entry.innerHTML = `
         <hr>
         <p><strong>They said:</strong> ${msg.original}</p>
         <p>
           <strong>Translation:</strong> ${msg.translation}
-          <button class="play-btn">🔊 Play</button>
-          <audio class="chat-audio" src="data:audio/mpeg;base64,${msg.audio}"></audio>
         </p>
+        ${audioHtml}
       `;
       transcript.append(entry);
-      entry.querySelector('.play-btn').addEventListener('click', () =>
-        entry.querySelector('.chat-audio').play()
-      );
-    }
 
+      // only wire up the button if it’s there
+      if (msg.audio) {
+        entry.querySelector('.play-btn').addEventListener('click', () =>
+          entry.querySelector('.chat-audio').play()
+        );
+        }
+    }
   });
   
 
@@ -265,6 +280,7 @@ function createUI() {
       console.log('[sendToWhisper] raw message:', data);
       const msg = JSON.parse(data);
       if (msg.speaker === 'you') {
+        console.log('[sendToWhisper] parsed preview:', msg);
         // ── text UI ───────────────────────────
         previewOriginal.value = msg.original;
         previewTranslation.innerHTML = `
