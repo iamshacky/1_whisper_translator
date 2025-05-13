@@ -31,7 +31,7 @@ function pickVoice(lang) {
     v = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
   }
   if (!v) {
-    // fallback to the browser default voice
+    // fallback to the browser default voice 
     v = voices.find(v => v.default) || voices[0];
     console.warn(`No TTS voice for "${lang}", falling back to "${v.lang}" (${v.name})`);
   }
