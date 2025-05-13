@@ -7,15 +7,15 @@ const rooms = new Map(); // roomId → Set<WebSocket>
 
 /**
  * Initializes your WebSocketServer:
- *  - binary frames → Whisper preview & translation back to sender
- *  - text frames   → broadcast original+translation to everyone in the room
+ *  - binary frames → Whisper preview + translation + optional TTS back to sender
+ *  - text frames   → broadcast original + translation to everyone in the room
  */
 export function setupWebSocket(wss) {
   wss.on('connection', (ws, req) => {
     // parse room, lang, clientId
     const url        = new URL(req.url, `http://${req.headers.host}`);
-    const roomId     = url.searchParams.get('room') || 'default';
-    const targetLang = url.searchParams.get('lang') || 'es';
+    const roomId     = url.searchParams.get('room')     || 'default';
+    const targetLang = url.searchParams.get('lang')     || 'es';
     const clientId   = url.searchParams.get('clientId') || randomUUID();
     ws.clientId      = clientId;
 
@@ -27,27 +27,40 @@ export function setupWebSocket(wss) {
       console.log('[WS] got', isBinary ? 'binary' : 'string', 'from', clientId);
       try {
         if (isBinary) {
-            // —— PREVIEW: transcribe, translate & TTS —— 
-            const { text, translation, audio } = await translateController(
-              Buffer.from(message),
-              targetLang
-            );
+          // —— PREVIEW: transcribe, translate & TTS —— 
+          const { text, translation, audio } = await translateController(
+            Buffer.from(message),
+            targetLang
+          );
 
-            console.log('[WS] sending preview back:', { text, translation, audio: audio.slice(0,20) + '…' });
-            
-            ws.send(JSON.stringify({
-              speaker:    'you',
-              original:   text,
+          // safe logging of a potentially missing audio blob
+          console.log(
+            '[WS] sending preview back:',
+            {
+              text,
               translation,
-              audio,       // base64 MP3
-              clientId
-            }));
+              audio: audio
+                ? audio.slice(0, 20) + '…'
+                : '(no audio)'
+            }
+          );
+
+          // build the payload, only attaching audio if it exists
+          const payload = {
+            speaker:    'you',
+            original:   text,
+            translation,
+            clientId
+          };
+          if (audio) payload.audio = audio;
+
+          ws.send(JSON.stringify(payload));
         } else {
           // —— FINAL CHAT —— broadcast to everyone in room
           const { original, translation, clientId: senderId } = JSON.parse(message.toString());
           for (const client of rooms.get(roomId)) {
             if (client.readyState !== WebSocket.OPEN) continue;
-            const speaker = client === ws ? 'you' : 'them';
+            const speaker = (client === ws) ? 'you' : 'them';
             client.send(JSON.stringify({
               speaker,
               original,
