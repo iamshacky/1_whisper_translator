@@ -193,7 +193,7 @@ function createUI() {
   const translation = match ? match[2] : '';
   const audioEl = document.getElementById('previewAudio');
   const audio = audioEl ? audioEl.src.split(',')[1] : '';
-  sendFinalMessage(text, translation, audio);
+  sendFinalMessage(text, translation, audio, previewTranslation);
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
@@ -412,7 +412,7 @@ function toggleButtons({ start, stop }) {
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
 }
 
-function sendFinalMessage(text, translation, audio) {
+function sendFinalMessage(text, translation, audio, previewTranslation) {
   if (!listenWs || listenWs.readyState !== WebSocket.OPEN) {
     console.warn('[sendFinalMessage] WebSocket not open');
     return;
@@ -436,6 +436,15 @@ function sendFinalMessage(text, translation, audio) {
   sendBtn.disabled = true;
   deleteBtn.disabled = true;
   statusElement('Idle');
+
+  const transcript = document.getElementById('transcript');
+  const entry = document.createElement('div');
+  entry.innerHTML = `
+    <hr>
+    <p><strong>You said:</strong> ${text}</p>
+    <p><strong>Translation:</strong> ${translation}</p>
+  `;
+  transcript.append(entry);
 }
 
 // wait for the voices to be ready before building the UI
