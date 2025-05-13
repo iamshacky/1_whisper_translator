@@ -233,17 +233,6 @@ function createUI() {
     }
   });
 
-  //── Recording → send binary over the same socket ──────────
-  /*
-  async function sendToWhisper(blob) {
-    statusElement('Transcribing…');
-    listenWs.send(blob);
-  }
-  */
-
-
-
-
    //── Recording → NEW ephemeral socket for preview ───────────
    async function sendToWhisper(blob) {
      statusElement('Transcribing…');
