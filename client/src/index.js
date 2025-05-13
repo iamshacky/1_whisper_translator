@@ -10,6 +10,7 @@ console.log('Using room:', ROOM);
 let mediaRecorder;
 let audioChunks = [];
 let currentLang = 'es';
+let listenWs;
 
 console.log('Module loaded: /src/index.js');
 
@@ -123,7 +124,13 @@ function createUI() {
   const audioEl = document.getElementById('previewAudio');
   const audio = audioEl ? audioEl.src.split(',')[1] : '';
   sendFinalMessage(text, translation, audio);
-};
+  previewOriginal.value = '';
+  previewTranslation.innerHTML = '';
+  retranslateBtn.disabled = true;
+  sendBtn.disabled = true;
+  deleteBtn.disabled = true;
+  statusElement('Idle');
+  };
 
   const previewContainer = document.createElement('div');
   previewContainer.style.border = '1px solid #ccc';
@@ -141,9 +148,11 @@ function createUI() {
   app.append(previewContainer);
 
   const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  /*
   const listenWs = new WebSocket(
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
+  */
   // we only ever use this one for text broadcasts
   listenWs.binaryType = 'arraybuffer';
 
