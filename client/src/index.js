@@ -115,6 +115,16 @@ function createUI() {
     statusElement(txt ? 'Preview' : 'Idle');
   });
 
+  sendBtn.onclick = () => {
+  const text = previewOriginal.value.trim();
+  const html = previewTranslation.innerHTML;
+  const match = html.match(/>([^<]+)<\/strong>:\s*(.*?)</);
+  const translation = match ? match[2] : '';
+  const audioEl = document.getElementById('previewAudio');
+  const audio = audioEl ? audioEl.src.split(',')[1] : '';
+  sendFinalMessage(text, translation, audio);
+};
+
   const previewContainer = document.createElement('div');
   previewContainer.style.border = '1px solid #ccc';
   previewContainer.style.padding = '8px';
@@ -333,6 +343,19 @@ function statusElement(txt) {
 function toggleButtons({ start, stop }) {
   if (start !== undefined) document.getElementById('start').disabled = start;
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
+}
+
+function sendFinalMessage(text, translation, audio) {
+  const msg = {
+    type: 'final',
+    speaker: 'them',  // optional – just for clarity
+    clientId: CLIENT_ID,
+    original: text,
+    translation,
+    audio,
+  };
+  listenWs.send(JSON.stringify(msg));
+  console.log('[sendFinalMessage] Sent final message:', msg);
 }
 
 // wait for the voices to be ready before building the UI
