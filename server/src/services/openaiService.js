@@ -56,24 +56,23 @@ export async function translateText(text, targetLang) {
   return resp.choices[0].message.content;
 }
 
-
 export async function textToSpeech(text) {
   try {
     const resp = await openai.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: "alloy",            // or another available voice
+      model: "tts-1",             // ✅ FIXED: use valid TTS model
+      voice: "alloy",             // other options: echo, fable, onyx, nova, shimmer
       input: text,
-      response_format: "base64"  // ← make sure you ask for base64!
+      response_format: "base64"   // get MP3 in base64 format
     });
+
     if (!resp.data) {
       console.warn("⚠️ textToSpeech returned no data:", resp);
-      return "";  // fail gracefully
+      return "";
     }
-    return resp.data;   // this should now be a base64-encoded MP3
+
+    return resp.data;  // base64-encoded MP3
   } catch (err) {
     console.error("❌ textToSpeech error:", err);
     return "";
   }
 }
-
-
