@@ -57,19 +57,23 @@ export async function translateText(text, targetLang) {
 }
 
 
-// at the bottom of server/src/services/openaiService.js
-/**
- * Turn text into an audio file via OpenAI TTS (gpt-4o-mini-tts)
- * @param {string} text
- * @returns {Promise<string>}  base64-encoded MP3
- */
 export async function textToSpeech(text) {
-  const resp = await openai.audio.speech.create({
-    model: "gpt-4o-mini-tts",
-    voice: "alloy",          // pick any supported voice
-    input: text,
-  });
-  // `.data` is a base64 string of the MP3
-  return resp.data;
+  try {
+    const resp = await openai.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "alloy",            // or another available voice
+      input: text,
+      response_format: "base64"  // ← make sure you ask for base64!
+    });
+    if (!resp.data) {
+      console.warn("⚠️ textToSpeech returned no data:", resp);
+      return "";  // fail gracefully
+    }
+    return resp.data;   // this should now be a base64-encoded MP3
+  } catch (err) {
+    console.error("❌ textToSpeech error:", err);
+    return "";
+  }
 }
+
 
