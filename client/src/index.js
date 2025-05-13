@@ -94,9 +94,11 @@ function createUI() {
   previewOriginal.id = 'previewOriginal';
   previewOriginal.rows = 3;
   previewOriginal.style.width = '100%';
+  // Added 5/13 at 9:50 am
+  previewOriginal.placeholder = 'Speak or type a message...';
 
   retranslateBtn.id = 'retranslateBtn';
-  retranslateBtn.textContent = 'Edit';
+  retranslateBtn.textContent = 'Re-Translate';
   retranslateBtn.disabled = true;
 
   sendBtn.id = 'sendBtn';
@@ -110,16 +112,84 @@ function createUI() {
   previewOriginal.addEventListener('input', () => {
     const txt = previewOriginal.value.trim();
     retranslateBtn.disabled = !txt;
-    deleteBtn.disabled     = !txt;
-    previewTranslation.innerHTML = '';
-    sendBtn.disabled = !txt;  // send available immediately
+    deleteBtn.disabled = !txt;
+    sendBtn.disabled = !txt;
+
+    // Only clear translation if preview is empty
+    if (!txt) previewTranslation.innerHTML = '';
+
     statusElement(txt ? 'Preview' : 'Idle');
   });
+
+  /* Hooked up retranslateBtn */
+  retranslateBtn.onclick = async () => {
+    const newText = previewOriginal.value.trim();
+    if (!newText) return;
+
+    statusElement('Re-translating…');
+    retranslateBtn.disabled = true;
+    sendBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/translate-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: newText,
+          targetLang: currentLang
+        })
+      });
+      const { translation, audio } = await response.json();
+
+      // rebuild the translation box
+      if (audio) {
+        previewTranslation.innerHTML = `
+          <p>
+            <strong>Translation:</strong> ${translation}
+            <button id="playPreviewBtn">🔊 Play</button>
+            <audio id="previewAudio"
+                  src="data:audio/mpeg;base64,${audio}">
+            </audio>
+          </p>
+        `;
+        document
+          .getElementById('playPreviewBtn')
+          .addEventListener('click', () =>
+            document.getElementById('previewAudio').play()
+          );
+      } else {
+        previewTranslation.innerHTML = `
+          <p>
+            <strong>Translation:</strong> ${translation}
+            <button id="playPreviewBtn">🔊 Play</button>
+          </p>
+        `;
+        document
+          .getElementById('playPreviewBtn')
+          .addEventListener('click', () =>
+            speak(translation)
+          );
+      }
+
+      // Re-enable buttons
+      sendBtn.disabled = false;
+      deleteBtn.disabled = false;
+      retranslateBtn.disabled = false;
+
+      statusElement('Preview');
+    } catch (err) {
+      console.error('Error re-translating:', err);
+      statusElement('Error');
+    }
+  };
+
 
   sendBtn.onclick = () => {
   const text = previewOriginal.value.trim();
   const html = previewTranslation.innerHTML;
-  const match = html.match(/>([^<]+)<\/strong>:\s*(.*?)</);
+  // Added/changed on 5/13 at 9:53 am
+  //const match = html.match(/>([^<]+)<\/strong>:\s*(.*?)</);
+  const match = html.match(/<strong>Translation:<\/strong>\s*(.*?)</);
   const translation = match ? match[2] : '';
   const audioEl = document.getElementById('previewAudio');
   const audio = audioEl ? audioEl.src.split(',')[1] : '';
@@ -205,22 +275,22 @@ function createUI() {
       statusElement('Preview');
     }
 
-
+/* */
     else if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-      // —— BROADCAST CHAT —— 
       let audioHtml = '';
       if (msg.audio) {
         audioHtml = `
           <button class="play-btn">🔊 Play</button>
           <audio class="chat-audio"
-                 src="data:audio/mpeg;base64,${msg.audio}"></audio>
+                src="data:audio/mpeg;base64,${msg.audio}"></audio>
         `;
       }
+
       const entry = document.createElement('div');
       entry.innerHTML = `
         <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-        <p><strong>Translation:</strong> ${msg.translation}</p>
+        <p><strong>They said:</strong> ${msg.translation}</p>
+        <p><em>(Original: ${msg.original})</em></p>
         ${audioHtml}
       `;
       transcript.append(entry);
@@ -343,16 +413,29 @@ function toggleButtons({ start, stop }) {
 }
 
 function sendFinalMessage(text, translation, audio) {
-  const msg = {
+  if (!listenWs || listenWs.readyState !== WebSocket.OPEN) {
+    console.warn('[sendFinalMessage] WebSocket not open');
+    return;
+  }
+
+  const finalMsg = {
     type: 'final',
-    speaker: 'them',  // optional – just for clarity
+    speaker: 'you',
     clientId: CLIENT_ID,
     original: text,
-    translation,
-    audio,
+    translation: translation, // ← this line must send actual value
+    audio: audio || ''
   };
-  listenWs.send(JSON.stringify(msg));
-  console.log('[sendFinalMessage] Sent final message:', msg);
+  listenWs.send(JSON.stringify(finalMsg));
+  console.log('[sendFinalMessage] Sent final message:', finalMsg);
+
+  // ✅ Clear preview box and buttons (insert this here)
+  previewOriginal.value = '';
+  previewTranslation.innerHTML = '';
+  retranslateBtn.disabled = true;
+  sendBtn.disabled = true;
+  deleteBtn.disabled = true;
+  statusElement('Idle');
 }
 
 // wait for the voices to be ready before building the UI

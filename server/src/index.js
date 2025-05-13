@@ -4,7 +4,8 @@ import { WebSocketServer } from 'ws';
 import path from 'path';
 import dotenv from 'dotenv';
 import { setupWebSocket } from './controllers/wsHandler.js';
-import { translateText } from './services/openaiService.js';
+import { translateText, textToSpeech } from './services/openaiService.js';
+
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use('/src',     express.static(path.resolve('client/src')));
 app.use('/config',  express.static(path.resolve('config')));
 
 // 4) Translation endpoint for edited text
+/*
 app.post('/api/translate-text', async (req, res) => {
   const { text, lang } = req.body;
   try {
@@ -28,6 +30,18 @@ app.post('/api/translate-text', async (req, res) => {
   } catch (err) {
     console.error('❌ /api/translate-text error:', err);
     res.status(500).json({ error: err.toString() });
+  }
+});
+*/
+app.post('/api/translate-text', async (req, res) => {
+  try {
+    const { text, targetLang } = req.body;
+    const translation = await translateText(text, targetLang);
+    const audio = await textToSpeech(translation);
+    res.json({ translation, audio });
+  } catch (err) {
+    console.error('❌ Error in /api/translate-text:', err);
+    res.status(500).json({ error: 'Translation failed' });
   }
 });
 
