@@ -186,14 +186,20 @@ function createUI() {
 
   sendBtn.onclick = () => {
   const text = previewOriginal.value.trim();
+  /*
   const html = previewTranslation.innerHTML;
-  // Added/changed on 5/13 at 9:53 am
-  //const match = html.match(/>([^<]+)<\/strong>:\s*(.*?)</);
-  const match = html.match(/<strong>Translation:<\/strong>\s*(.*?)</);
+  const match = html.match(/>([^<]+)<\/strong>:\s*(.*?)</);
   const translation = match ? match[2] : '';
+  */
+  /* Above replaced with below 2 consts on 5/13 at 12pm*/
+  const translationEl = previewTranslation.querySelector('p');
+  const translationText = translationEl
+    ? translationEl.textContent.replace('Translation:', '').trim()
+    : '';
+
   const audioEl = document.getElementById('previewAudio');
   const audio = audioEl ? audioEl.src.split(',')[1] : '';
-  sendFinalMessage(text, translation, audio, previewTranslation);
+  sendFinalMessage(text, translationText, audio, previewTranslation);
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
@@ -429,14 +435,6 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
   listenWs.send(JSON.stringify(finalMsg));
   console.log('[sendFinalMessage] Sent final message:', finalMsg);
 
-  // ✅ Clear preview box and buttons (insert this here)
-  previewOriginal.value = '';
-  previewTranslation.innerHTML = '';
-  retranslateBtn.disabled = true;
-  sendBtn.disabled = true;
-  deleteBtn.disabled = true;
-  statusElement('Idle');
-
   const transcript = document.getElementById('transcript');
   const entry = document.createElement('div');
   entry.innerHTML = `
@@ -445,6 +443,26 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
     <p><strong>Translation:</strong> ${translation}</p>
   `;
   transcript.append(entry);
+
+
+  // ✅ Clear preview box and buttons (insert this here)
+  previewOriginal.value = '';
+  previewTranslation.innerHTML = '';
+  retranslateBtn.disabled = true;
+  sendBtn.disabled = true;
+  deleteBtn.disabled = true;
+  statusElement('Idle');
+
+  /*
+  const transcript = document.getElementById('transcript');
+  const entry = document.createElement('div');
+  entry.innerHTML = `
+    <hr>
+    <p><strong>You said:</strong> ${text}</p>
+    <p><strong>Translation:</strong> ${translation}</p>
+  `;
+  transcript.append(entry);
+  */
 }
 
 // wait for the voices to be ready before building the UI
