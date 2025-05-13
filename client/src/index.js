@@ -130,197 +130,6 @@ function createUI() {
   previewContainer.querySelector('h3').textContent = 'Preview';
   app.append(previewContainer);
 
-  //── Always listen for broadcasts ────────────────────────
-  /*
-  const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const listenWs = new WebSocket(
-    `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
-  );
-  listenWs.binaryType = 'arraybuffer';
-
-  listenWs.addEventListener('open', () => {
-    console.log('🔔 [listenWs] connected, listening for others in room:', ROOM);
-  });
-
-  // …after you’ve created & opened your `listenWs`…
-  listenWs.addEventListener('message', ({ data }) => {
-    const msg = JSON.parse(data);
-    
-    if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
-      const entry = document.createElement('div');
-
-      // build the HTML with an optional audio section
-      let audioHtml = '';
-      if (msg.audio) {
-        audioHtml = `
-          <button class="play-btn">🔊 Play</button>
-          <audio class="chat-audio"
-                src="data:audio/mpeg;base64,${msg.audio}">
-          </audio>
-        `;
-      }
-
-      entry.innerHTML = `
-        <hr>
-        <p><strong>They said:</strong> ${msg.original}</p>
-        <p>
-          <strong>Translation:</strong> ${msg.translation}
-        </p>
-        ${audioHtml}
-      `;
-      transcript.append(entry);
-
-      // only wire up the button if it’s there
-      if (msg.audio) {
-        entry.querySelector('.play-btn').addEventListener('click', () =>
-          entry.querySelector('.chat-audio').play()
-        );
-        }
-    }
-  });
-  
-
-  //── Preview → re-translate/Edit ────────────────────────
-  retranslateBtn.addEventListener('click', async () => {
-    const edited = previewOriginal.value.trim();
-    if (!edited) return;
-    statusElement('Translating…');
-    try {
-      const resp = await fetch('/api/translate-text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: edited, lang: currentLang })
-      });
-      if (!resp.ok) throw new Error(resp.status);
-      const { translation } = await resp.json();
-      previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${translation}</p>`;
-      statusElement('Preview');
-      sendBtn.disabled = false;
-    } catch (err) {
-      console.error('Translate error', err);
-      statusElement('Error');
-    }
-  });
-
-  //── Delete preview ──────────────────────────────────────
-  deleteBtn.addEventListener('click', () => {
-    statusElement('Idle');
-    previewOriginal.value = '';
-    previewTranslation.innerHTML = '';
-    retranslateBtn.disabled = true;
-    sendBtn.disabled = true;
-    deleteBtn.disabled = true;
-  });
-
-  //── Send final message ──────────────────────────────────
-  //── Send final message (auto-translate if needed) ───────────────────
-  sendBtn.addEventListener('click', async () => {
-    const original = previewOriginal.value.trim();
-    let translation = previewTranslation.textContent
-                          .replace(/^Translation:/, '')
-                          .trim();
- 
-    // if the server-side preview didn’t fill it, do one more translate step
-    if (!translation) {
-      statusElement('Translating…');
-      try {
-        const resp = await fetch('/api/translate-text', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: original, lang: currentLang })
-        });
-        if (!resp.ok) throw new Error(resp.status);
-        const { translation: tx } = await resp.json();
-        translation = tx;
-        previewTranslation.innerHTML = `<p><strong>Translation:</strong> ${translation}</p>`;
-      } catch (err) {
-        console.error('Translate error', err);
-        return statusElement('Error');
-      }
-    }
- 
-    // 1) Local echo …
-    const entry = document.createElement('div');
-    entry.innerHTML = `
-      <hr>
-      <p><strong>You said:</strong> ${original}</p>
-      <p><strong>Translation:</strong> ${translation}</p>
-    `;
-    transcript.append(entry);
-    transcript.scrollTop = transcript.scrollHeight;
- 
-    // 2) TTS under the click gesture
-    speak(translation, () => statusElement('Idle'));
- 
-    // 3) Broadcast to others
-    listenWs.send(JSON.stringify({ original, translation, clientId: CLIENT_ID }));
- 
-    // 4) Reset preview
-    statusElement('Idle');
-    previewOriginal.value        = '';
-    previewTranslation.innerHTML = '';
-    retranslateBtn.disabled      = true;
-    sendBtn.disabled             = true;
-    deleteBtn.disabled           = true;
-  });
- 
-  //── Inside createUI: only one sendToWhisper ─────────────
-  async function sendToWhisper(blob) {
-    statusElement('Transcribing…');
-    const ws = new WebSocket(
-      `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
-    );
-    ws.binaryType = 'arraybuffer';
-
-    ws.addEventListener('open', () => {
-      console.log('WS open – sending audio blob');
-      ws.send(blob);
-    });
-
-    ws.addEventListener('message', ({ data }) => {
-      console.log('[sendToWhisper] raw message:', data);
-      const msg = JSON.parse(data);
-      if (msg.speaker === 'you') {
-        console.log('[sendToWhisper] parsed preview:', msg);
-        // ── text UI ───────────────────────────
-        previewOriginal.value = msg.original;
-        previewTranslation.innerHTML = `
-          <p>
-            <strong>Translation:</strong> ${msg.translation}
-            <button id="playPreviewBtn">🔊 Play</button>
-            <audio 
-              id="previewAudio"
-              src="data:audio/mpeg;base64,${msg.audio}"
-            ></audio>
-          </p>
-        `;
-
-        // ── wire up play under a click gesture ─── 
-        previewTranslation
-          .querySelector('#playPreviewBtn')
-          .addEventListener('click', () => {
-            document.getElementById('previewAudio').play();
-          });
-
-        // …then enable buttons as before…
-        retranslateBtn.disabled = false;
-        sendBtn.disabled       = false;
-        deleteBtn.disabled     = false;
-        toggleButtons({ start: false, stop: true });
-        statusElement('Preview');
-        ws.close();
-      }
-    });
-
-
-
-
-    ws.addEventListener('error', err => {
-      console.error('WS error', err);
-      statusElement('Error');
-    });
-  }
-  */
   const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const listenWs = new WebSocket(
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
@@ -336,33 +145,49 @@ function createUI() {
     const msg = JSON.parse(data);
 
     if (msg.speaker === 'you') {
-      // —— PREVIEW —— 
       previewOriginal.value = msg.original;
-      previewTranslation.innerHTML = `
-        <p>
-          <strong>Translation:</strong> ${msg.translation}
-          <button id="playPreviewBtn">🔊 Play</button>
-          <audio 
-            id="previewAudio"
-            src="data:audio/mpeg;base64,${msg.audio}"
-          ></audio>
-        </p>
-      `;
 
-      // user-gesture playback
-      previewTranslation
-        .querySelector('#playPreviewBtn')
-        .addEventListener('click', () =>
-          document.getElementById('previewAudio').play()
-        );
+      // if we got server-generated audio, wire up the <audio> tag…
+      if (msg.audio) {
+        previewTranslation.innerHTML = `
+          <p>
+            <strong>Translation:</strong> ${msg.translation}
+            <button id="playPreviewBtn">🔊 Play</button>
+            <audio id="previewAudio"
+                  src="data:audio/mpeg;base64,${msg.audio}">
+            </audio>
+          </p>
+        `;
+        document
+          .getElementById('playPreviewBtn')
+          .addEventListener('click', () =>
+            document.getElementById('previewAudio').play()
+          );
+      }
+      // …otherwise fall back to the browser TTS…
+      else {
+        previewTranslation.innerHTML = `
+          <p>
+            <strong>Translation:</strong> ${msg.translation}
+            <button id="playPreviewBtn">🔊 Play</button>
+          </p>
+        `;
+        document
+          .getElementById('playPreviewBtn')
+          .addEventListener('click', () =>
+            speak(msg.translation)
+          );
+      }
 
-      // enable the controls
+      // enable your preview/Edit buttons here…
       retranslateBtn.disabled = false;
       sendBtn.disabled       = false;
       deleteBtn.disabled     = false;
       toggleButtons({ start: false, stop: true });
       statusElement('Preview');
     }
+
+
     else if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
       // —— BROADCAST CHAT —— 
       let audioHtml = '';
@@ -418,31 +243,47 @@ function createUI() {
      previewWs.addEventListener('message', ({ data }) => {
        const msg = JSON.parse(data);
        if (msg.speaker === 'you') {
-         // —— PREVIEW —— 
-         previewOriginal.value = msg.original;
-         previewTranslation.innerHTML = `
-           <p>
-             <strong>Translation:</strong> ${msg.translation}
-             <button id="playPreviewBtn">🔊 Play</button>
-             <audio 
-               id="previewAudio"
-               src="data:audio/mpeg;base64,${msg.audio}"
-             ></audio>
-           </p>
-         `;
-         // wire up the play button under user gesture
-         previewTranslation
-           .querySelector('#playPreviewBtn')
-           .addEventListener('click', () =>
-             document.getElementById('previewAudio').play()
-           );
- 
-         // enable the preview controls
-         retranslateBtn.disabled = false;
-         sendBtn.disabled       = false;
-         deleteBtn.disabled     = false;
-         toggleButtons({ start: false, stop: true });
-         statusElement('Preview');
+          previewOriginal.value = msg.original;
+
+          // if we got server-generated audio, wire up the <audio> tag…
+          if (msg.audio) {
+            previewTranslation.innerHTML = `
+              <p>
+                <strong>Translation:</strong> ${msg.translation}
+                <button id="playPreviewBtn">🔊 Play</button>
+                <audio id="previewAudio"
+                      src="data:audio/mpeg;base64,${msg.audio}">
+                </audio>
+              </p>
+            `;
+            document
+              .getElementById('playPreviewBtn')
+              .addEventListener('click', () =>
+                document.getElementById('previewAudio').play()
+              );
+          }
+          // …otherwise fall back to the browser TTS…
+          else {
+            previewTranslation.innerHTML = `
+              <p>
+                <strong>Translation:</strong> ${msg.translation}
+                <button id="playPreviewBtn">🔊 Play</button>
+              </p>
+            `;
+            document
+              .getElementById('playPreviewBtn')
+              .addEventListener('click', () =>
+                speak(msg.translation)
+              );
+          }
+
+          // enable your preview/Edit buttons here…
+          retranslateBtn.disabled = false;
+          sendBtn.disabled       = false;
+          deleteBtn.disabled     = false;
+          toggleButtons({ start: false, stop: true });
+          statusElement('Preview');
+
  
          // done with this socket
          previewWs.close();

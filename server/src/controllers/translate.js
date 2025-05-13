@@ -17,12 +17,22 @@ export async function translateController(audioBuffer, targetLang = 'es') {
   // 2) Translate
   const translation = await translateText(text, targetLang);
 
-  // 3) Generate TTS MP3 (base64)
-  const audio = await textToSpeech(translation);
-
-  console.log('→ [translateController] text:', text);
-  console.log('→ [translateController] translation:', translation);
-  console.log('→ [translateController] audio length:', audio.length);
+  // 3) Generate TTS MP3 (base64), but don’t crash if it fails
+   let audio;
+   try {
+     audio = await textToSpeech(translation);
+   } catch (err) {
+     console.error('❌ [translateController] textToSpeech failed:', err);
+     audio = null;
+   }
+ 
+   console.log('→ [translateController] text:', text);
+   console.log('→ [translateController] translation:', translation);
+   if (typeof audio === 'string') {
+     console.log('→ [translateController] audio length:', audio.length);
+   } else {
+     console.warn('⚠️ [translateController] no audio returned from TTS');
+   }
 
   return { text, translation, audio };
 }
