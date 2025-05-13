@@ -59,18 +59,16 @@ export async function translateText(text, targetLang) {
 export async function textToSpeech(text) {
   try {
     const resp = await openai.audio.speech.create({
-      model: "tts-1",             // ✅ FIXED: use valid TTS model
-      voice: "alloy",             // other options: echo, fable, onyx, nova, shimmer
+      model: "tts-1",            // or "tts-1-hd"
+      voice: "alloy",
       input: text,
-      response_format: "base64"   // get MP3 in base64 format
+      response_format: "mp3"     // ✅ FIXED: must be a supported format like "mp3"
     });
 
-    if (!resp.data) {
-      console.warn("⚠️ textToSpeech returned no data:", resp);
-      return "";
-    }
+    const buffer = Buffer.from(await resp.arrayBuffer());  // Convert the stream to a Buffer
+    const base64 = buffer.toString('base64');
+    return base64;
 
-    return resp.data;  // base64-encoded MP3
   } catch (err) {
     console.error("❌ textToSpeech error:", err);
     return "";
