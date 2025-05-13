@@ -147,12 +147,11 @@ function createUI() {
   previewContainer.querySelector('h3').textContent = 'Preview';
   app.append(previewContainer);
 
-  const proto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  /*
-  const listenWs = new WebSocket(
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  listenWs = new WebSocket(
     `${proto}//${location.host}/ws?room=${ROOM}&lang=${currentLang}&clientId=${CLIENT_ID}`
   );
-  */
+
   // we only ever use this one for text broadcasts
   listenWs.binaryType = 'arraybuffer';
 
