@@ -193,7 +193,7 @@ function createUI() {
   const audioEl = document.getElementById('previewAudio');
   const audio = audioEl ? audioEl.src.split(',')[1] : '';
   sendFinalMessage(text, translationText, audio, previewTranslation);
-  
+
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
@@ -456,14 +456,12 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
   }
 
   // ✅ Clear preview box and buttons (insert this here)
-  /*
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
   sendBtn.disabled = true;
   deleteBtn.disabled = true;
   statusElement('Idle');
-  */
 
   /*
   const transcript = document.getElementById('transcript');
