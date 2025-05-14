@@ -271,7 +271,7 @@ function createUI() {
 /* */
     else if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
       console.log('[listenWs] Incoming message from other client:', msg);
-      
+
       let audioHtml = '';
       if (msg.audio) {
         audioHtml = `
@@ -390,6 +390,57 @@ function createUI() {
   }
 
   function stopTranslating() {
+    function sendFinalMessage(text, translation, audio) {
+      if (!listenWs || listenWs.readyState !== WebSocket.OPEN) {
+        console.warn('[sendFinalMessage] WebSocket not open');
+        return;
+      }
+
+      const finalMsg = {
+        type: 'final',
+        speaker: 'you',
+        clientId: CLIENT_ID,
+        original: text,
+        translation: translation,
+        audio: audio || ''
+      };
+      listenWs.send(JSON.stringify(finalMsg));
+      console.log('[sendFinalMessage] Sent final message:', finalMsg);
+
+      const transcript = document.getElementById('transcript');
+      const entry = document.createElement('div');
+
+      let audioHtml = '';
+      if (audio) {
+        audioHtml = `
+          <button class="play-btn">🔊 Play</button>
+          <audio class="chat-audio" src="data:audio/mpeg;base64,${audio}"></audio>
+        `;
+      }
+
+      entry.innerHTML = `
+        <hr>
+        <p><strong>You said:</strong> ${text}</p>
+        <p><strong>Translation:</strong> ${translation}</p>
+        ${audioHtml}
+      `;
+      transcript.append(entry);
+
+      if (audio) {
+        entry.querySelector('.play-btn').addEventListener('click', () =>
+          entry.querySelector('.chat-audio').play()
+        );
+      }
+
+      // ✅ Reset preview
+      previewOriginal.value = '';
+      previewTranslation.innerHTML = '';
+      retranslateBtn.disabled = true;
+      sendBtn.disabled = true;
+      deleteBtn.disabled = true;
+      statusElement('Idle');
+    }
+
     console.log('Stop clicked');
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
@@ -407,6 +458,7 @@ function toggleButtons({ start, stop }) {
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
 }
 
+/*
 function sendFinalMessage(text, translation, audio) {
   if (!listenWs || listenWs.readyState !== WebSocket.OPEN) {
     console.warn('[sendFinalMessage] WebSocket not open');
@@ -457,6 +509,7 @@ function sendFinalMessage(text, translation, audio) {
   deleteBtn.disabled = true;
   statusElement('Idle');
 }
+*/
 
 // wait for the voices to be ready before building the UI
 window.addEventListener('load', async () => {
