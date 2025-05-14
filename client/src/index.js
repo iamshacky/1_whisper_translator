@@ -185,22 +185,17 @@ function createUI() {
 
 
   sendBtn.onclick = () => {
-  const text = previewOriginal.value.trim();
-  const translationText = previewTranslation.querySelector('strong')
-  ? previewTranslation.querySelector('strong').nextSibling.textContent.trim()
-  : '';
+    const text = previewOriginal.value.trim();
+    const translationText = previewTranslation.querySelector('strong')
+      ? previewTranslation.querySelector('strong').nextSibling.textContent.trim()
+      : '';
+    const audioEl = document.getElementById('previewAudio');
+    const audio = audioEl ? audioEl.src.split(',')[1] : '';
 
-  const audioEl = document.getElementById('previewAudio');
-  const audio = audioEl ? audioEl.src.split(',')[1] : '';
-  sendFinalMessage(text, translationText, audio, previewTranslation);
-
-  previewOriginal.value = '';
-  previewTranslation.innerHTML = '';
-  retranslateBtn.disabled = true;
-  sendBtn.disabled = true;
-  deleteBtn.disabled = true;
-  statusElement('Idle');
+    sendFinalMessage(text, translationText, audio);  // ✅ remove 4th argument
   };
+
+  
 
   const previewContainer = document.createElement('div');
   previewContainer.id = 'previewContainer';
@@ -275,6 +270,8 @@ function createUI() {
 
 /* */
     else if (msg.speaker === 'them' && msg.clientId !== CLIENT_ID) {
+      console.log('[listenWs] Incoming message from other client:', msg);
+      
       let audioHtml = '';
       if (msg.audio) {
         audioHtml = `
@@ -410,7 +407,7 @@ function toggleButtons({ start, stop }) {
   if (stop  !== undefined) document.getElementById('stop').disabled  = stop;
 }
 
-function sendFinalMessage(text, translation, audio, previewTranslation) {
+function sendFinalMessage(text, translation, audio) {
   if (!listenWs || listenWs.readyState !== WebSocket.OPEN) {
     console.warn('[sendFinalMessage] WebSocket not open');
     return;
@@ -421,7 +418,7 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
     speaker: 'you',
     clientId: CLIENT_ID,
     original: text,
-    translation: translation, // ← this line must send actual value
+    translation: translation,
     audio: audio || ''
   };
   listenWs.send(JSON.stringify(finalMsg));
@@ -434,8 +431,7 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
   if (audio) {
     audioHtml = `
       <button class="play-btn">🔊 Play</button>
-      <audio class="chat-audio"
-            src="data:audio/mpeg;base64,${audio}"></audio>
+      <audio class="chat-audio" src="data:audio/mpeg;base64,${audio}"></audio>
     `;
   }
 
@@ -453,7 +449,7 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
     );
   }
 
-  // ✅ Clear preview box and buttons (insert this here)
+  // ✅ Reset preview
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
