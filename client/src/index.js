@@ -186,20 +186,14 @@ function createUI() {
 
   sendBtn.onclick = () => {
   const text = previewOriginal.value.trim();
-  /*
-  const html = previewTranslation.innerHTML;
-  const match = html.match(/>([^<]+)<\/strong>:\s*(.*?)</);
-  const translation = match ? match[2] : '';
-  */
-  /* Above replaced with below 2 consts on 5/13 at 12pm*/
-  const translationEl = previewTranslation.querySelector('p');
-  const translationText = translationEl
-    ? translationEl.textContent.replace('Translation:', '').trim()
-    : '';
+  const translationText = previewTranslation.querySelector('strong')
+  ? previewTranslation.querySelector('strong').nextSibling.textContent.trim()
+  : '';
 
   const audioEl = document.getElementById('previewAudio');
   const audio = audioEl ? audioEl.src.split(',')[1] : '';
   sendFinalMessage(text, translationText, audio, previewTranslation);
+  
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
@@ -437,21 +431,39 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
 
   const transcript = document.getElementById('transcript');
   const entry = document.createElement('div');
+
+  let audioHtml = '';
+  if (audio) {
+    audioHtml = `
+      <button class="play-btn">🔊 Play</button>
+      <audio class="chat-audio"
+            src="data:audio/mpeg;base64,${audio}"></audio>
+    `;
+  }
+
   entry.innerHTML = `
     <hr>
     <p><strong>You said:</strong> ${text}</p>
     <p><strong>Translation:</strong> ${translation}</p>
+    ${audioHtml}
   `;
   transcript.append(entry);
 
+  if (audio) {
+    entry.querySelector('.play-btn').addEventListener('click', () =>
+      entry.querySelector('.chat-audio').play()
+    );
+  }
 
   // ✅ Clear preview box and buttons (insert this here)
+  /*
   previewOriginal.value = '';
   previewTranslation.innerHTML = '';
   retranslateBtn.disabled = true;
   sendBtn.disabled = true;
   deleteBtn.disabled = true;
   statusElement('Idle');
+  */
 
   /*
   const transcript = document.getElementById('transcript');
