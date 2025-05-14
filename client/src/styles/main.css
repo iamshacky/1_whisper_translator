@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-﻿/* mobile-first reset */
-=======
+
 /* mobile-first reset */
->>>>>>> 92de43b (Update main.css)
 * { box-sizing: border-box; margin:0; padding:0; }
 body {
   font-family: sans-serif;
@@ -49,4 +46,12 @@ textarea {
   textarea { font-size: 0.9rem; }
   h3 { font-size: 1rem; }
   #transcript div p { font-size: 0.95rem; }
+}
+
+/* Light background to visually separate the preview area */
+#previewContainer {
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+  padding: 8px;
+  margin: 8px 0;
 }

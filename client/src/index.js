@@ -203,9 +203,7 @@ function createUI() {
   };
 
   const previewContainer = document.createElement('div');
-  previewContainer.style.border = '1px solid #ccc';
-  previewContainer.style.padding = '8px';
-  previewContainer.style.margin = '8px 0';
+  previewContainer.id = 'previewContainer';
   previewContainer.append(
     document.createElement('h3'),
     previewOriginal,
@@ -462,17 +460,6 @@ function sendFinalMessage(text, translation, audio, previewTranslation) {
   sendBtn.disabled = true;
   deleteBtn.disabled = true;
   statusElement('Idle');
-
-  /*
-  const transcript = document.getElementById('transcript');
-  const entry = document.createElement('div');
-  entry.innerHTML = `
-    <hr>
-    <p><strong>You said:</strong> ${text}</p>
-    <p><strong>Translation:</strong> ${translation}</p>
-  `;
-  transcript.append(entry);
-  */
 }
 
 // wait for the voices to be ready before building the UI
